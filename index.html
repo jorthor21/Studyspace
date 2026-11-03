@@ -314,12 +314,12 @@ body{margin:0}
       <button data-tab="list">Floors</button>
       <button data-tab="book">Bookings<span class="n" id="navN" hidden></span></button>
       <button data-tab="friends">Friends</button>
-      <button data-tab="more">More</button>
+      <button data-tab="more">Insights</button>
     </nav>
   </div></div>
 
   <aside class="bench" id="bench">
-    <section id="s-lab">
+    <section id="s-lab" hidden>
       <div><p class="eyebrow">Sensor lab · simulated hardware</p><h2>Try the occupancy rules</h2><p class="lede">Use the sensor here and watch the seat change on the map.</p></div>
       <div class="seg" id="labPick"></div>
       <div id="labBody" style="display:grid;gap:10px"></div>
@@ -329,6 +329,14 @@ body{margin:0}
         <input id="thr" type="range" min="10" max="60" step="5" value="30">
       </div>
       <div class="log mono" id="log" aria-live="polite"></div>
+    </section>
+    <section id="s-ins">
+      <div><p class="eyebrow">For campus managers · simulated data</p><h2>How the campus is used today</h2></div>
+      <label class="toggle"><input type="checkbox" id="exam"> Simulate exam week</label>
+      <div class="kpis" id="kpis"></div>
+      <div class="chart"><p class="muted" style="margin-bottom:6px">Seats in use across campus, by half hour</p><div id="chart"></div></div>
+      <div class="chart" id="floorBars"></div>
+      <p class="muted" id="insNote"></p>
       <details class="align" id="alignBox"><summary>Place seats on the real map</summary>
         <div class="align-body">
           <p class="muted">The seats are fitted to the building outline, but their exact spots are estimates. Nudge them with the MazeMap building, then fine-tune single spaces.</p>
@@ -341,14 +349,6 @@ body{margin:0}
           <textarea id="aOut" rows="3" hidden style="width:100%;font-family:var(--mono);font-size:11px"></textarea>
         </div>
       </details>
-    </section>
-    <section id="s-ins">
-      <div><p class="eyebrow">For campus managers · simulated data</p><h2>How the campus is used today</h2></div>
-      <label class="toggle"><input type="checkbox" id="exam"> Simulate exam week</label>
-      <div class="kpis" id="kpis"></div>
-      <div class="chart"><p class="muted" style="margin-bottom:6px">Seats in use across campus, by half hour</p><div id="chart"></div></div>
-      <div class="chart" id="floorBars"></div>
-      <p class="muted" id="insNote"></p>
     </section>
   </aside>
 </div>
@@ -655,7 +655,7 @@ function renderSheet(){
       :`${pill}${detail}<p class="muted">Check in within ${Math.max(0,mine.until-T)} min to keep your seats.</p>
       <div class="actions"><button class="btn primary" data-act="checkin">Check in</button><button class="btn ghost" data-act="cancel">Cancel booking</button>${shareBtn}</div>`;
   }else{
-    body=`${pill}${detail}<div class="actions">${primary}${share&&share.sp===sp?`<button class="btn ghost" data-act="unshare">Stop sharing</button>`:`<button class="btn ghost" data-act="share">Share my spot</button>`}<button class="btn ghost" data-act="test">Test in sensor lab</button></div>`;
+    body=`${pill}${detail}<div class="actions">${primary}${share&&share.sp===sp?`<button class="btn ghost" data-act="unshare">Stop sharing</button>`:`<button class="btn ghost" data-act="share">Share my spot</button>`}</div>`;
   }
   setH(sh,`<div class="sheet-head"><div><h2>${sp.name}</h2><p class="muted">${where}</p></div><button class="close" data-act="close" aria-label="Close">×</button></div>
   ${body}`);
@@ -1063,7 +1063,7 @@ bindAlign();
 /* ---------- start ---------- */
 function start(){
   target_sp=null;
-  adopt(demoDesk);
+  adopt(demoDesk);demoDesk.seats[0].manual=false;
   renderFloors();drawFloor();renderSummary();
   const sp=demoTable;if(!mm)sel=sp;
   cam.s=.86;const[w,h]=mapSize();cam.x=w/2-sp.x*cam.s-60;cam.y=h*.42-sp.y*cam.s;applyCam();
