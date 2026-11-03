@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#16263A">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="StudySpace">
 <link rel="stylesheet" href="https://api.mazemap.com/js/v2.1.2/mazemap.min.css">
 <script src="https://api.mazemap.com/js/v2.1.2/mazemap.min.js"></script>
 <title>StudySpace BI Nydalen</title>
@@ -1073,5 +1080,6 @@ function start(){
 }
 initReal();
 start();
+if("serviceWorker" in navigator&&location.protocol==="https:"||location.hostname==="localhost")navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
 </body></html>
