@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="stylesheet" href="https://api.mazemap.com/js/v2.1.2/mazemap.min.css">
+<script src="https://api.mazemap.com/js/v2.1.2/mazemap.min.js"></script>
+<title>StudySpace BI Nydalen</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: the student app in a phone beside a "sensor lab" bench; on a real phone the bench becomes tabs. */
+:root{
+  --bg:#E6E8E7; --surface:#FFFFFF; --surface-2:#F2F3F2; --ink:#16263A; --muted:#5C6875; --line:#D9DDDD;
+  --floor:#F7F7F5; --block:#FFFFFF; --wall:#C9CFD0; --void:#E4E7E6; --table:#D9C3A5; --bezel:#20262D;
+  --free:#16A163; --taken:#E0464B; --off:#A3ABB2; --accent:#1F5FBF; --on-ink:#FFFFFF; --ok-soft:#E0F3E9; --bad-soft:#FBE5E5; --off-soft:#ECEEEF;
+  --display:"Schibsted Grotesk",-apple-system,"Segoe UI",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --gl:max(16px,env(safe-area-inset-left,0px)); --gr:max(16px,env(safe-area-inset-right,0px));
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0F151C; --surface:#18212B; --surface-2:#212C37; --ink:#EDF1F4; --muted:#9BA8B4; --line:#2E3A46;
+  --floor:#141C25; --block:#1E2833; --wall:#3A4754; --void:#111821; --table:#7A6548; --bezel:#05080B;
+  --free:#2CC17E; --taken:#F0666A; --off:#6D7883; --accent:#78AEFF; --on-ink:#0F151C; --ok-soft:#173A2B; --bad-soft:#442226; --off-soft:#2A3540; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F151C; --surface:#18212B; --surface-2:#212C37; --ink:#EDF1F4; --muted:#9BA8B4; --line:#2E3A46;
+  --floor:#141C25; --block:#1E2833; --wall:#3A4754; --void:#111821; --table:#7A6548; --bezel:#05080B;
+  --free:#2CC17E; --taken:#F0666A; --off:#6D7883; --accent:#78AEFF; --on-ink:#0F151C; --ok-soft:#173A2B; --bad-soft:#442226; --off-soft:#2A3540; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--display);font-size:15px;line-height:1.4;overflow:hidden;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3,p{margin:0}
+.stage{height:100%;display:grid;grid-template-columns:minmax(0,392px) minmax(0,560px);gap:36px;justify-content:center;align-items:center;padding-block:16px;padding-left:var(--gl);padding-right:var(--gr)}
+.phone{height:100%;max-height:840px;background:var(--bezel);border-radius:46px;padding:9px;min-height:0}
+.app{height:100%;background:var(--surface);border-radius:38px;overflow:hidden;display:flex;flex-direction:column;position:relative}
+.view{flex:1;min-height:0;display:none;flex-direction:column}
+.view.on{display:flex}
+.top{padding:20px 18px 10px;display:grid;gap:10px}
+.title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+h1{font-size:25px;line-height:1.1;font-weight:700;letter-spacing:-.02em}
+.sub{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.livedot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--free);margin-right:5px;vertical-align:1px}
+.icon-btn{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);font-weight:600;flex:none}
+.search{position:relative}
+.search input{width:100%;height:40px;border-radius:12px;border:1px solid transparent;background:var(--surface-2);padding:0 12px 0 36px}
+.search input::placeholder{color:var(--muted)}
+.search svg{position:absolute;left:12px;top:12px;stroke:var(--muted)}
+.results{position:absolute;z-index:30;left:0;right:0;top:44px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 28px rgba(10,20,30,.18);max-height:280px;overflow:auto}
+.results button{display:flex;justify-content:space-between;gap:12px;width:100%;text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+.results button:last-child{border-bottom:0}
+.results small{color:var(--muted);white-space:nowrap}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.chip{height:32px;padding:0 12px;border-radius:10px;background:var(--surface-2);font-size:13px;font-weight:500;white-space:nowrap;flex:none}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.map{flex:1;min-height:0;position:relative;background:var(--floor);overflow:hidden;touch-action:none;margin:0 10px;border-radius:16px;user-select:none;cursor:grab}
+.map svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.summary{position:absolute;left:10px;top:10px;right:54px;background:var(--surface);border-radius:12px;padding:7px 11px;box-shadow:0 2px 10px rgba(10,20,30,.12);pointer-events:none;z-index:3}
+.summary b{display:block;font-size:14px;font-variant-numeric:tabular-nums}
+.summary span{font-size:12px;color:var(--muted)}
+.floors{position:absolute;right:10px;top:10px;display:grid;gap:4px;z-index:3}
+.floors button,.zoom button{width:36px;height:36px;border-radius:10px;background:var(--surface);box-shadow:0 2px 8px rgba(10,20,30,.12);font-weight:600;font-variant-numeric:tabular-nums}
+.floors button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.zoom{position:absolute;right:10px;bottom:10px;display:grid;gap:4px;z-index:3}
+.tip{position:absolute;z-index:4;transform:translate(-50%,calc(-100% - 12px));background:var(--ink);color:var(--surface);border-radius:10px;padding:6px 10px;font-size:12px;pointer-events:none;white-space:nowrap}
+.tip b{display:block;font-size:13px}
+.tip:after{content:"";position:absolute;left:50%;bottom:-5px;width:10px;height:10px;background:var(--ink);transform:translateX(-50%) rotate(45deg)}
+.legend{display:flex;justify-content:center;gap:14px;font-size:12px;padding:8px 12px;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:5px}
+.lg{width:10px;height:10px;border-radius:50%;background:var(--free)}
+.lg.t{background:var(--taken);box-shadow:inset 0 0 0 3px var(--taken),inset 0 0 0 5px #fff}
+.lg.o{background:transparent;box-shadow:inset 0 0 0 2px var(--off)}
+/* map marks */
+.b-shell{fill:var(--block);stroke:var(--wall);stroke-width:2}
+.b-other{fill:var(--void);stroke:var(--wall);stroke-width:2}
+.b-void{fill:var(--void);stroke:var(--wall);stroke-width:1.5}
+.b-label{fill:var(--muted);font:600 15px var(--display)}
+.street-label{fill:var(--muted);font:500 12px var(--display);letter-spacing:.04em;text-transform:uppercase}
+.tbl{fill:var(--table)}
+.room{fill:var(--surface-2);stroke:var(--wall);stroke-width:1.5}
+.room-t{fill:var(--muted);font:600 10px var(--display);text-anchor:middle}
+.deskbg{fill:var(--surface-2);stroke:var(--line);stroke-width:1}
+.pin{fill:var(--free);stroke:none;transition:fill .3s}
+.st-occ .pin{fill:var(--taken)}
+.st-off .pin{fill:none;stroke:var(--off);stroke-width:2.5}
+.core{fill:#fff;display:none}
+.st-occ .core{display:block}
+.space{cursor:pointer}
+.space.dim{opacity:.14}
+.space.sel .halo{display:block}
+.halo{display:none;fill:none;stroke:var(--accent);stroke-width:3}
+.lod-far .near{display:none}
+.lod-near .far{display:none}
+.bubble rect{fill:var(--ink)}
+.bubble text{fill:var(--surface);font:600 15px var(--display);text-anchor:middle}
+.bubble text.s{font:400 11px var(--display)}
+.bubble{cursor:pointer}
+/* sheet */
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:20px 20px 0 0;box-shadow:0 -8px 30px rgba(10,20,30,.2);padding:14px 18px 18px;z-index:20;display:grid;gap:10px;max-height:70%;overflow:auto}
+.sheet-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+h2{font-size:19px;line-height:1.2;font-weight:700;letter-spacing:-.01em}
+.close{width:30px;height:30px;border-radius:50%;background:var(--surface-2);flex:none}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:3px 9px;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.pill.free{background:var(--ok-soft);color:var(--free)}
+.pill.occ{background:var(--bad-soft);color:var(--taken)}
+.pill.off{background:var(--off-soft);color:var(--muted)}
+@media (prefers-color-scheme:light){.pill.free{color:#0B7A49}.pill.occ{color:#B92B31}}
+:root[data-theme="light"] .pill.free{color:#0B7A49}:root[data-theme="light"] .pill.occ{color:#B92B31}
+.seatbar{display:flex;gap:4px}
+.seatbar i{flex:1;height:9px;border-radius:3px;background:var(--free)}
+.seatbar i.occ{background:var(--taken)}
+.seatbar i.off{background:var(--off)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{flex:1 1 140px;min-height:44px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;text-align:center;font-weight:600;font-size:14px;text-decoration:none;padding:8px 12px}
+.btn.primary{background:var(--ink);color:var(--surface)}
+.btn.ghost{background:var(--surface-2);color:var(--ink)}
+.btn.small{min-height:38px;font-size:13px}
+.muted{color:var(--muted);font-size:13px}
+/* bottom nav */
+.nav{display:none;border-top:1px solid var(--line);background:var(--surface);padding:6px var(--gr) calc(6px + env(safe-area-inset-bottom,0px)) var(--gl)}
+.nav button{flex:1;height:42px;border-radius:10px;font-size:13px;font-weight:600;color:var(--muted)}
+.nav button[aria-current="true"]{color:var(--ink);background:var(--surface-2)}
+/* floors list */
+.list{flex:1;overflow:auto;padding:4px 18px 18px;display:grid;gap:10px;align-content:start}
+.row{display:grid;gap:7px;text-align:left;width:100%;padding:12px 0;border-bottom:1px solid var(--line)}
+.row-top{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.row b{font-size:15px}
+.count{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.count small{font-size:12px;font-weight:500;color:var(--muted)}
+.track{height:6px;background:var(--ok-soft);border-radius:3px;overflow:hidden}
+.track i{display:block;height:100%;background:var(--taken);border-radius:3px;transition:width .4s}
+/* bench */
+.bench{height:100%;max-height:840px;overflow:auto;display:grid;gap:30px;align-content:start;padding:8px 6px 8px 0;min-width:0}
+.bench section{display:grid;gap:12px;min-width:0}
+.eyebrow{font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.bench h2{font-size:22px}
+.lede{color:var(--muted);max-width:60ch}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.rig{display:grid;grid-template-columns:150px minmax(0,1fr);gap:18px;align-items:center;background:var(--surface);border-radius:16px;padding:16px}
+.device{height:88px;display:grid;place-items:center}
+.unit{width:112px;height:66px;border-radius:22px;background:linear-gradient(180deg,#FAFAF8,#DADBD8);box-shadow:0 8px 16px rgba(10,20,30,.22),inset 0 -5px 0 #C9CAC6;display:grid;place-items:center;position:relative;color:#6F7377;font:600 10px var(--display);letter-spacing:.05em}
+.unit.long{width:142px;height:46px;border-radius:15px}
+.led{position:absolute;bottom:7px;left:50%;margin-left:-3px;width:6px;height:6px;border-radius:50%;background:var(--free);box-shadow:0 0 8px var(--free)}
+.led.occ{background:var(--taken);box-shadow:0 0 8px var(--taken)}
+.rig-state{display:grid;gap:7px;min-width:0}
+.meter{height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent);transition:width .3s}
+.mono{font-family:var(--mono);font-size:12px;font-variant-numeric:tabular-nums}
+.ctrl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.ctrl .btn{flex:none;background:var(--surface)}
+.ctrl .btn[aria-pressed="true"]{box-shadow:inset 0 0 0 2px var(--ink)}
+.zones{background:var(--surface);border-radius:16px;padding:14px;display:grid;gap:8px}
+.zgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.zgrid .board{grid-column:1/-1;height:18px;border-radius:5px;background:var(--table)}
+.zone{min-height:54px;border-radius:10px;background:var(--ok-soft);font-size:12px;font-weight:600;padding:5px;font-variant-numeric:tabular-nums}
+.zone.occ{background:var(--bad-soft)}
+.zone small{display:block;font-weight:400;color:var(--muted)}
+.tune{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center}
+.tune input{grid-column:1/-1;width:100%;accent-color:var(--accent)}
+.log{background:var(--surface);border-radius:12px;padding:10px 12px;height:128px;overflow:auto;display:grid;gap:3px;align-content:start}
+.log div{display:grid;grid-template-columns:42px minmax(0,1fr);gap:8px}
+.log time{color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.kpi{background:var(--surface);border-radius:12px;padding:10px 12px}
+.kpi b{display:block;font-size:24px;line-height:1.15;font-variant-numeric:tabular-nums}
+.kpi span{font-size:12px;color:var(--muted)}
+.chart{background:var(--surface);border-radius:12px;padding:12px}
+.chart svg{display:block;width:100%;height:auto}
+.c-bar{fill:var(--accent)}
+.c-grid{stroke:var(--line);stroke-width:1}
+.c-t{fill:var(--muted);font:400 10px var(--display)}
+.toggle{display:flex;align-items:center;gap:8px;font-weight:500}
+.toggle input{width:18px;height:18px;accent-color:var(--accent);margin:0}
+.dialog{position:absolute;inset:0;background:var(--surface);z-index:40;padding:24px 20px;overflow:auto;display:grid;gap:12px;align-content:start}
+.dialog ul{margin:0;padding-left:18px;display:grid;gap:7px}
+.dialog h3{font-size:15px;margin-top:6px}
+@media (max-width:860px){
+  .stage{display:block;padding:0}
+  .phone{max-height:none;border-radius:0;padding:0;background:none}
+  .app{border-radius:0}
+  .top{padding:14px var(--gr) 10px var(--gl)}
+  .nav{display:flex;gap:4px}
+  .map{margin:0}
+  .list{padding-left:var(--gl);padding-right:var(--gr)}
+  .bench{position:fixed;inset:0 0 calc(55px + env(safe-area-inset-bottom,0px));background:var(--surface);max-height:none;display:none;padding:16px var(--gr) 20px var(--gl);z-index:25;height:auto}
+  .bench.on{display:grid}
+  .bench section{display:none}
+  .bench section.on{display:grid}
+  .rig,.zones,.kpi,.chart,.log,.ctrl .btn{background:var(--surface-2)}
+  .ctrl .btn{background:var(--surface-2)}
+  .sheet{padding-left:var(--gl);padding-right:var(--gr)}
+  .dialog{padding-left:var(--gl);padding-right:var(--gr)}
+}
+@media (max-height:640px) and (min-width:861px){.legend{display:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+#mm,#ov{position:absolute;inset:0;width:100%;height:100%}
+#ov{pointer-events:none;z-index:2}
+.real #svg{display:none}
+.real .map{cursor:default;touch-action:auto}
+.notice{position:absolute;left:10px;right:10px;bottom:56px;z-index:5;background:var(--ink);color:var(--surface);font-size:12px;padding:8px 10px;border-radius:10px}
+details.align{background:var(--surface);border-radius:12px;padding:10px 12px}
+details.align summary{font-weight:600;cursor:pointer}
+.align-body{display:grid;gap:10px;margin-top:10px}
+.align label{display:grid;grid-template-columns:96px minmax(0,1fr);gap:8px;align-items:center;font-size:13px}
+.align input[type=range]{width:100%;accent-color:var(--accent)}
+.align .toggle{display:flex}
+html{height:100%}
+#bbl{position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden}
+.mbub{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;min-width:68px;min-height:46px;padding:4px 10px;border-radius:12px;background:var(--ink);color:var(--surface);display:grid;line-height:1.15;box-shadow:0 3px 10px rgba(10,20,30,.25)}
+.mbub b{font-size:17px;font-variant-numeric:tabular-nums}
+.mbub span{font-size:11px;white-space:nowrap}
+#backBtn{position:absolute;left:10px;bottom:10px;z-index:3;height:36px;padding:0 12px;border-radius:10px;background:var(--surface);box-shadow:0 2px 8px rgba(10,20,30,.12);font-size:13px;font-weight:600}
+</style>
+</head><body>
+
+<div class="stage">
+  <div class="phone"><div class="app" id="app">
+    <div class="view on" id="v-map">
+      <div class="top">
+        <div class="title-row">
+          <div><h1>Study Spaces</h1><p class="sub"><span class="livedot"></span>Live occupancy · <span id="clock">13:40</span></p></div>
+          <button class="icon-btn" id="infoBtn" aria-label="About this prototype">i</button>
+        </div>
+        <div class="search">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="1.8" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+          <input id="q" type="search" placeholder="Search for a space..." autocomplete="off" aria-label="Search for a space">
+          <div class="results" id="results" hidden></div>
+        </div>
+        <div class="chips" id="chips" role="group" aria-label="Filter spaces">
+          <button class="chip" data-f="all" aria-pressed="true">All</button>
+          <button class="chip" data-f="desk" aria-pressed="false">Desks</button>
+          <button class="chip" data-f="table" aria-pressed="false">Group Tables</button>
+          <button class="chip" data-f="room" aria-pressed="false">Rooms</button>
+        </div>
+      </div>
+      <div class="map" id="map">
+        <div id="mm" hidden></div><canvas id="ov" hidden></canvas><div id="bbl" hidden></div><button id="backBtn" hidden>Whole campus</button>
+        <div class="notice" id="notice" hidden></div>
+        <svg id="svg" aria-label="Floor plan of BI Nydalen with seat availability" role="img"></svg>
+        <div class="summary"><b id="sumA"></b><span id="sumB"></span></div>
+        <div class="floors" id="floors" role="group" aria-label="Choose floor"></div>
+        <div class="zoom"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button></div>
+        <div class="tip" id="tip" hidden></div>
+      </div>
+      <div class="legend"><span><i class="lg"></i>Available</span><span><i class="lg t"></i>Occupied</span><span><i class="lg o"></i>Unavailable</span></div>
+    </div>
+
+    <div class="view" id="v-list">
+      <div class="top"><h1>Where to study</h1><p class="sub">Free seats right now, busiest floors last</p></div>
+      <div class="list" id="list"></div>
+    </div>
+
+    <div class="sheet" id="sheet" hidden></div>
+    <div class="dialog" id="dialog" hidden>
+      <div class="sheet-head"><h2>About this prototype</h2><button class="close" id="dialogClose" aria-label="Close">×</button></div>
+      <p>StudySpace shows students where they can study before they have to search.</p>
+      <h3>What is real</h3>
+      <ul><li>The map is the real MazeMap map of BI (campus 10), loaded from MazeMap.</li><li>The building shape follows public descriptions: four blocks split by two cross-shaped internal streets, with the library on floors 4 and 5.</li><li>The occupancy rules follow the concept: button, sensor backup and a 30-minute automatic release.</li></ul>
+      <h3>What is simulated</h3>
+      <ul><li>All occupancy is generated by simulated students. No sensors are connected.</li><li>Seat, table and room positions are placeholders drawn on top of the real map.</li><li>MazeMap integration is a proposed partnership, not an agreement.</li></ul>
+    </div>
+    <nav class="nav" id="nav" aria-label="Main">
+      <button data-tab="map" aria-current="true">Map</button>
+      <button data-tab="list">Floors</button>
+      <button data-tab="lab">Sensors</button>
+      <button data-tab="ins">Insights</button>
+    </nav>
+  </div></div>
+
+  <aside class="bench" id="bench">
+    <section id="s-lab">
+      <div><p class="eyebrow">Sensor lab · simulated hardware</p><h2>Try the occupancy rules</h2><p class="lede">Use the sensor here and watch the seat change on the map.</p></div>
+      <div class="seg" id="labPick"></div>
+      <div id="labBody" style="display:grid;gap:10px"></div>
+      <div class="tune">
+        <label for="thr"><b>Inactivity release</b><br><span class="muted">The concept starts at 30 minutes and needs testing with students.</span></label>
+        <span class="mono" id="thrV">30 min</span>
+        <input id="thr" type="range" min="10" max="60" step="5" value="30">
+      </div>
+      <div class="log mono" id="log" aria-live="polite"></div>
+      <details class="align" id="alignBox"><summary>Place seats on the real map</summary>
+        <div class="align-body">
+          <p class="muted">The seats are fitted to the building outline, but their exact spots are estimates. Nudge them with the MazeMap building, then fine-tune single spaces.</p>
+          <label>East / west<input id="aX" type="range" min="-150" max="150" value="0"></label>
+          <label>North / south<input id="aY" type="range" min="-150" max="150" value="0"></label>
+          <label>Rotate<input id="aR" type="range" min="-180" max="180" value="0"></label>
+          <label>Size<input id="aS" type="range" min="40" max="200" value="100"></label>
+          <span class="toggle"><input type="checkbox" id="aMove"><label for="aMove" style="display:inline">Tap the map to move the selected space</label></span>
+          <div class="ctrl"><button class="btn small" id="aCopy">Copy positions</button><button class="btn small" id="aReset">Reset positions</button></div>
+          <textarea id="aOut" rows="3" hidden style="width:100%;font-family:var(--mono);font-size:11px"></textarea>
+        </div>
+      </details>
+    </section>
+    <section id="s-ins">
+      <div><p class="eyebrow">For campus managers · simulated data</p><h2>How the campus is used today</h2></div>
+      <label class="toggle"><input type="checkbox" id="exam"> Simulate exam week</label>
+      <div class="kpis" id="kpis"></div>
+      <div class="chart"><p class="muted" style="margin-bottom:6px">Seats in use across campus, by half hour</p><div id="chart"></div></div>
+      <div class="chart" id="floorBars"></div>
+      <p class="muted" id="insNote"></p>
+    </section>
+  </aside>
+</div>
+
+<script>
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const NS="http://www.w3.org/2000/svg";
+const svgEl=(t,a={},p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);p&&p.appendChild(e);return e};
+const setH=(el,h)=>{if(el._h!==h){el.innerHTML=h;el._h=h}};
+const fmt=t=>{const m=((t%1440)+1440)%1440;return String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")};
+let seed=20261103;
+const rnd=()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const pick=(a,b)=>a+Math.floor(rnd()*(b-a+1));
+
+/* ---------- campus model (schematic) ---------- */
+const FLOORS={
+  5:{name:"Library",desks:2,tables:5,rooms:3,w:1.25},
+  4:{name:"Library",desks:2,tables:5,rooms:3,w:1.2},
+  2:{name:"Atrium meeting tables",desks:0,tables:3,rooms:3,w:.65},
+  1:{name:"Classroom level",desks:1,tables:3,rooms:2,w:.55}
+};
+const BLOCKS=[{k:"B",ox:80,oy:80,fx:0,fy:0,w:1},{k:"A",ox:530,oy:80,fx:1,fy:0,w:1.2},{k:"C",ox:80,oy:530,fx:0,fy:1,w:.7}];
+const SIZE=390, TBL=[[100,95,6],[215,95,4],[100,190,6],[100,285,4],[215,335,6]], ROOMS=[[300,120],[300,190],[300,260]];
+const spaces=[],byId={},seats=[];
+function addSpace(sp,pts,occOff){
+  sp.seats=pts.map((p,i)=>{const s={id:sp.id+"#"+i,sp,i,x:p[0],y:p[1],st:occOff?"off":"free",last:0,leave:0,present:"away",forget:false,manual:false};seats.push(s);return s});
+  spaces.push(sp);byId[sp.id]=sp;
+}
+for(const f of Object.keys(FLOORS).map(Number)){
+  const c=FLOORS[f];
+  for(const b of BLOCKS){
+    const P=(x,y)=>[b.ox+(b.fx?SIZE-x:x),b.oy+(b.fy?SIZE-y:y)];
+    let n=1;
+    const desk=(x,y)=>{const num=String(n++).padStart(2,"0"),p=P(x,y);addSpace({id:`${b.k}${f}-D${num}`,type:"desk",name:`Desk ${b.k}${f}-${num}`,floor:f,block:b.k,w:b.w*c.w,x:p[0],y:p[1]},[p],rnd()<.02)};
+    if(c.desks>=1)for(let x=26;x<=364;x+=34)desk(x,26);
+    if(c.desks>=2)for(let y=60;y<=364;y+=34)desk(26,y);
+    TBL.slice(0,c.tables).forEach((t,i)=>{
+      const p=P(t[0],t[1]),m=t[2]/2,pts=[];
+      for(const dy of[-27,27])for(let j=0;j<m;j++)pts.push([p[0]+(j-(m-1)/2)*26,p[1]+dy]);
+      const demo=b.k==="A"&&f===4&&i===0;
+      addSpace({id:`${b.k}${f}-T${i+1}`,type:"table",name:demo?"Group Table A":`Group Table ${b.k}${f}-${i+1}`,floor:f,block:b.k,w:b.w*c.w*1.15,x:p[0],y:p[1],tw:m*26+8},pts);
+    });
+    ROOMS.slice(0,c.rooms).forEach((r,i)=>{
+      const p=P(r[0]+36,r[1]+30);
+      addSpace({id:`${b.k}${f}-R${i+1}`,type:"room",name:`Group Room ${b.k}${f}-${i+1}`,floor:f,block:b.k,w:b.w*c.w,x:p[0],y:p[1],cap:[6,8,4][i]},[p]);
+    });
+  }
+}
+const live=seats.filter(s=>s.st!=="off");
+const isSeat=s=>s.sp.type!=="room";
+const floorName=f=>`${FLOORS[f].name} · Floor ${f}`;
+const freeSeats=(arr)=>arr.reduce((n,s)=>n+(s.st==="free"&&isSeat(s)?1:0),0);
+const totalSeats=(arr)=>arr.reduce((n,s)=>n+(s.st!=="off"&&isSeat(s)?1:0),0);
+
+/* ---------- occupancy engine ---------- */
+let T=8*60, threshold=30, exam=false, listening=false;
+const stats={button:0,auto:0,falseRel:0};
+const hist={};
+const CURVE=[[6,.03],[8,.14],[10,.56],[12,.7],[14,.73],[16,.62],[18,.42],[20,.26],[22,.08],[24,.03]];
+function target(t){
+  const h=((t%1440)/60);let r=CURVE[0][1];
+  for(let i=0;i<CURVE.length-1;i++){const[a,x]=CURVE[i],[b,y]=CURVE[i+1];if(h>=a&&h<b)r=x+(y-x)*(h-a)/(b-a)}
+  return Math.min(.97,r*(exam?1.32:1));
+}
+function logEv(s,msg){
+  if(!listening||!s.manual)return;
+  const log=$("#log"),d=document.createElement("div");
+  d.innerHTML=`<time>${fmt(T)}</time><span></span>`;d.lastChild.textContent=`${s.sp.name}${s.sp.type==="table"?" seat "+(s.i+1):""}: ${msg}`;
+  log.prepend(d);while(log.children.length>40)log.lastChild.remove();
+}
+function occupy(s,via){s.st="occ";s.last=T;logEv(s,via==="button"?"button pressed, marked occupied":"activity detected, marked occupied")}
+function release(s,why){
+  s.st="free";s.present="away";
+  if(why==="button"){stats.button++;logEv(s,"button pressed, available now")}
+  else{stats.auto++;logEv(s,`no activity for ${threshold} min, released automatically`)}
+}
+function step(){
+  T++;
+  for(const s of live){
+    if(s.st!=="occ")continue;
+    if(s.manual){if(s.present==="active")s.last=T}
+    else if(T<s.leave){if(rnd()<.5)s.last=T}
+    else if(!s.forget){release(s,"button");continue}
+    if(T-s.last>=threshold){
+      if(s.manual&&s.present==="still"){stats.falseRel++;logEv(s,"false release: student is still here")}
+      release(s,"auto");
+    }
+  }
+  const occ=live.reduce((n,s)=>n+(s.st==="occ"?1:0),0);
+  const want=Math.round((target(T)*live.length-occ)*.12);
+  if(want>0){
+    const free=live.filter(s=>s.st==="free"&&!s.manual);
+    for(let i=0;i<want&&free.length;i++){
+      let tot=0;for(const s of free)tot+=s.sp.w;
+      let r=rnd()*tot,j=0;for(;j<free.length-1;j++){r-=free[j].sp.w;if(r<=0)break}
+      const s=free.splice(j,1)[0];
+      s.st="occ";s.last=T;s.leave=T+pick(45,170);s.forget=rnd()<.3;
+    }
+  }
+  if(T%30===0)hist[T]=live.reduce((n,s)=>n+(s.st==="occ"?1:0),0)/live.length;
+}
+function setState(){
+  while(T<13*60+40)step();
+}
+setState();
+listening=true;
+
+/* ---------- lab targets ---------- */
+const demoDesk=byId["A4-D07"], demoTable=byId["A4-T1"];
+let target_sp=null;
+function adopt(sp){
+  if(target_sp)target_sp.seats.forEach(s=>{if(s.st==="occ"){s.leave=T+pick(20,90);s.forget=false}s.manual=false});
+  target_sp=sp;
+  sp.seats.forEach(s=>{if(s.st==="off")s.st="free";s.manual=true;s.present=s.st==="occ"?"active":"away";s.last=T});
+  buildLab();updateLab();renderAll();
+  logEv(sp.seats[0],"sensor ready, choose an action above");
+}
+function prepDemo(){
+  demoTable.seats.forEach((s,i)=>{s.st=i<4?"occ":"free";s.last=T;s.leave=T+200;s.forget=false});
+  demoDesk.seats[0].st="free";demoDesk.seats[0].manual=true;
+}
+prepDemo();
+
+/* ---------- map ---------- */
+let floor=4, filter="all", sel=null, cam={x:0,y:0,s:1};
+const svg=$("#svg"), mapEl=$("#map"), world=svgEl("g",{},svg);
+let nodes={}, bubbles=[];
+function drawFloor(){
+  world.textContent="";nodes={};bubbles=[];
+  svgEl("rect",{x:40,y:40,width:920,height:920,rx:30,fill:"var(--void)"},world);
+  const lab=(x,y,t,c="street-label",extra={})=>{const e=svgEl("text",{x,y,class:c,...extra},world);e.textContent=t;return e};
+  for(const b of BLOCKS){
+    svgEl("rect",{x:b.ox,y:b.oy,width:SIZE,height:SIZE,rx:18,class:"b-shell"},world);
+    const ax=b.ox+(b.fx?SIZE-280:160),ay=b.oy+(b.fy?SIZE-280:160);
+    svgEl("rect",{x:ax,y:ay,width:120,height:120,rx:12,class:"b-void"},world);
+    lab(ax+60,ay+56,"Block "+b.k,"b-label",{"text-anchor":"middle"});
+    lab(ax+60,ay+74,"Atrium","c-t",{"text-anchor":"middle"});
+  }
+  svgEl("rect",{x:530,y:530,width:SIZE,height:SIZE,rx:18,class:"b-other"},world);
+  lab(725,718,"Athletica","b-label",{"text-anchor":"middle"});
+  lab(725,738,"Not BI study space","c-t",{"text-anchor":"middle"});
+  lab(500,506,"Central room","street-label",{"text-anchor":"middle"});
+  const near=svgEl("g",{class:"near"},world);
+  for(const sp of spaces.filter(s=>s.floor===floor)){
+    const g=svgEl("g",{class:"space","data-id":sp.id},near);
+    if(sp.type==="desk"){
+      svgEl("rect",{x:sp.x-13,y:sp.y-13,width:26,height:26,rx:6,class:"deskbg"},g);
+      const n=svgEl("g",{},g);svgEl("circle",{cx:sp.x,cy:sp.y,r:8,class:"pin"},n);svgEl("circle",{cx:sp.x,cy:sp.y,r:2.6,class:"core"},n);
+      svgEl("rect",{x:sp.x-16,y:sp.y-16,width:32,height:32,rx:8,class:"halo"},g);
+      nodes[sp.seats[0].id]=n;
+    }else if(sp.type==="table"){
+      svgEl("rect",{x:sp.x-sp.tw/2,y:sp.y-14,width:sp.tw,height:28,rx:7,class:"tbl"},g);
+      sp.seats.forEach(s=>{const n=svgEl("g",{},g);svgEl("circle",{cx:s.x,cy:s.y,r:8,class:"pin"},n);svgEl("circle",{cx:s.x,cy:s.y,r:2.6,class:"core"},n);nodes[s.id]=n});
+      svgEl("rect",{x:sp.x-sp.tw/2-8,y:sp.y-40,width:sp.tw+16,height:80,rx:10,class:"halo"},g);
+      svgEl("rect",{x:sp.x-sp.tw/2-8,y:sp.y-40,width:sp.tw+16,height:80,fill:"transparent"},g);
+    }else{
+      svgEl("rect",{x:sp.x-36,y:sp.y-30,width:72,height:60,rx:8,class:"room"},g);
+      const t=svgEl("text",{x:sp.x,y:sp.y+21,class:"room-t"},g);t.textContent=`${sp.cap} seats`;
+      const n=svgEl("g",{},g);svgEl("circle",{cx:sp.x,cy:sp.y-5,r:9,class:"pin"},n);svgEl("circle",{cx:sp.x,cy:sp.y-5,r:3,class:"core"},n);
+      svgEl("rect",{x:sp.x-39,y:sp.y-33,width:78,height:66,rx:10,class:"halo"},g);
+      nodes[sp.seats[0].id]=n;
+    }
+  }
+  const far=svgEl("g",{class:"far"},world);
+  for(const b of BLOCKS){
+    const cx=b.ox+SIZE/2,cy=b.oy+SIZE/2;
+    const g=svgEl("g",{class:"bubble","data-block":b.k},far),inner=svgEl("g",{},g);
+    svgEl("rect",{x:-34,y:-23,width:68,height:46,rx:12},inner);
+    const a=svgEl("text",{y:-1},inner),c=svgEl("text",{y:15,class:"s"},inner);c.textContent="seats free";
+    bubbles.push({b,g,inner,a,cx,cy});
+  }
+  applyCam();updateMap();
+}
+function updateMap(){
+  for(const s of seats){const n=nodes[s.id];if(!n)continue;n.setAttribute("class","st-"+s.st)}
+  world.querySelectorAll(".space").forEach(g=>{
+    const sp=byId[g.dataset.id];
+    g.classList.toggle("dim",filter!=="all"&&sp.type!==filter);
+    g.classList.toggle("sel",sel===sp);
+  });
+  for(const x of bubbles){
+    const list=seats.filter(s=>s.sp.floor===floor&&s.sp.block===x.b.k&&(filter==="all"||s.sp.type===filter));
+    x.a.textContent=filter==="room"?list.filter(s=>s.st==="free").length:freeSeats(list);
+    x.g.lastChild.lastChild.textContent=filter==="room"?"rooms free":"seats free";
+  }
+}
+function mapSize(){return[mapEl.clientWidth||340,mapEl.clientHeight||380]}
+function clampCam(){
+  const[w,h]=mapSize(),min=Math.min(w,h)/1000;
+  cam.s=Math.max(min,Math.min(2.4,cam.s));
+  const span=1000*cam.s,pad=Math.min(120,Math.max(0,(span-Math.min(w,h))*.3));
+  cam.x=span<w?(w-span)/2:Math.min(pad,Math.max(w-span-pad,cam.x));
+  cam.y=span<h?(h-span)/2:Math.min(pad,Math.max(h-span-pad,cam.y));
+}
+function applyCam(){
+  clampCam();
+  world.setAttribute("transform",`translate(${cam.x} ${cam.y}) scale(${cam.s})`);
+  svg.setAttribute("class",cam.s<.62?"lod-far":"lod-near");
+  for(const x of bubbles)x.g.setAttribute("transform",`translate(${x.cx} ${x.cy}) scale(${Math.min(3,1/(cam.s*1.1))})`);
+  placeTip();
+}
+let anim=0;
+function flyTo(wx,wy,s,yFrac=.5){
+  const[w,h]=mapSize(),to={s,x:w/2-wx*s,y:h*yFrac-wy*s},from={...cam},st=performance.now();
+  cancelAnimationFrame(anim);
+  if(matchMedia("(prefers-reduced-motion:reduce)").matches){cam=to;applyCam();return}
+  const run=n=>{const p=Math.min(1,(n-st)/320),e=1-Math.pow(1-p,3);
+    cam={s:from.s+(to.s-from.s)*e,x:from.x+(to.x-from.x)*e,y:from.y+(to.y-from.y)*e};applyCam();if(p<1)anim=requestAnimationFrame(run)};
+  anim=requestAnimationFrame(run);
+}
+function zoomAt(f,px,py){const[w,h]=mapSize();px??=w/2;py??=h/2;const s=Math.max(Math.min(w,h)/1000,Math.min(2.4,cam.s*f)),r=s/cam.s;cam={s,x:px-(px-cam.x)*r,y:py-(py-cam.y)*r};applyCam()}
+function placeTip(){
+  const t=$("#tip");
+  if(!sel||sel.floor!==floor||cam.s<.62||$("#v-map").classList.contains("on")===false){t.hidden=true;return}
+  const free=freeSeats(sel.seats),tot=sel.seats.length;
+  const label=sel.type==="table"?`${tot-free} / ${tot} occupied`:sel.seats[0].st==="occ"?"Occupied":sel.seats[0].st==="off"?"Unavailable":"Available";
+  setH(t,`<b>${sel.name}</b>${label}`);
+  const dy=(sel.type==="table"?40:sel.type==="room"?33:14)*cam.s;
+  t.style.left=Math.max(80,Math.min(mapSize()[0]-80,sel.x*cam.s+cam.x))+"px";t.style.top=(sel.y*cam.s+cam.y-dy)+"px";t.hidden=false;
+}
+/* pointer handling: drag, pinch, tap */
+const ptrs=new Map();let moved=0,pinch=0;
+mapEl.addEventListener("pointerdown",e=>{
+  if(e.target.closest("button"))return;
+  mapEl.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,[e.offsetX,e.offsetY,e.clientX,e.clientY]);moved=0;pinch=0;cancelAnimationFrame(anim);
+  mapEl._down=document.elementFromPoint(e.clientX,e.clientY);
+});
+mapEl.addEventListener("pointermove",e=>{
+  const p=ptrs.get(e.pointerId);if(!p)return;
+  if(ptrs.size===1){const dx=e.clientX-p[2],dy=e.clientY-p[3];moved+=Math.abs(dx)+Math.abs(dy);cam.x+=dx;cam.y+=dy;p[2]=e.clientX;p[3]=e.clientY;applyCam()}
+  else if(ptrs.size===2){p[2]=e.clientX;p[3]=e.clientY;const[a,b]=[...ptrs.values()],d=Math.hypot(a[2]-b[2],a[3]-b[3]),r=mapEl.getBoundingClientRect();
+    if(pinch)zoomAt(d/pinch,(a[2]+b[2])/2-r.left,(a[3]+b[3])/2-r.top);pinch=d;moved=99}
+});
+const endPtr=e=>{
+  if(!ptrs.delete(e.pointerId))return;
+  if(moved<7&&ptrs.size===0){
+    const hit=mapEl._down;const sg=hit&&hit.closest&&hit.closest(".space"),bb=hit&&hit.closest&&hit.closest(".bubble");
+    if(sg)select(byId[sg.dataset.id]);
+    else if(bb){const x=bubbles.find(q=>q.g===bb);flyTo(x.cx,x.cy,.86)}
+    else select(null);
+  }
+};
+mapEl.addEventListener("pointerup",endPtr);mapEl.addEventListener("pointercancel",endPtr);
+mapEl.addEventListener("wheel",e=>{e.preventDefault();const r=mapEl.getBoundingClientRect();zoomAt(e.deltaY<0?1.12:.89,e.clientX-r.left,e.clientY-r.top)},{passive:false});
+$("#zin").onclick=()=>zoomAt(1.4);$("#zout").onclick=()=>zoomAt(.7);
+
+/* ---------- selection sheet ---------- */
+function select(sp,opts={}){
+  sel=sp;
+  const sh=$("#sheet");
+  if(!sp){sh.hidden=true;sh._h=null;updateMap();placeTip();return}
+  if(sp.floor!==floor){floor=sp.floor;drawFloor();renderFloors()}
+  renderSheet();sh.hidden=false;updateMap();
+  flyTo(sp.x,sp.y,Math.max(cam.s,.86),.3);
+}
+function statusText(s){
+  if(s.st==="off")return"Sensor offline. This spot is hidden from search until it is back.";
+  if(s.st==="free")return"Free right now.";
+  const left=Math.max(0,threshold-(T-s.last));
+  return left<=10?`No recent activity. Releases in ${left} min unless someone moves.`:"In use, with recent activity.";
+}
+function renderSheet(){
+  const sp=sel,sh=$("#sheet");if(!sp||sh.hidden&&sh._h===null&&false)return;
+  const fr=freeSeats(sp.seats),tot=sp.seats.length,one=sp.seats[0];
+  let pill,detail;
+  if(sp.type==="table"){
+    pill=`<span class="pill ${fr?"free":"occ"}">${tot-fr} of ${tot} seats occupied · ${fr} available</span>`;
+    detail=`<div class="seatbar" aria-hidden="true">${sp.seats.map(s=>`<i class="${s.st==="free"?"":s.st}"></i>`).join("")}</div>`;
+  }else{
+    pill=`<span class="pill ${one.st}">${one.st==="free"?"Available":one.st==="occ"?"Occupied":"Unavailable"}</span>`;
+    detail=`<p class="muted">${statusText(one)}</p>`;
+  }
+  const where=`Block ${sp.block} · ${FLOORS[sp.floor].name}, floor ${sp.floor}${sp.cap?` · ${sp.cap} seats`:""}`;
+  const url=`https://use.mazemap.com/#v=1&campusid=10&zlevel=${sp.floor}&center=10.768052,59.948499&zoom=18`;
+  setH(sh,`<div class="sheet-head"><div><h2>${sp.name}</h2><p class="muted">${where}</p></div><button class="close" data-act="close" aria-label="Close">×</button></div>
+  ${pill}${detail}
+  <div class="actions"><a class="btn primary" href="${url}" target="_blank" rel="noopener">Open in MazeMap</a><button class="btn ghost" data-act="test">Test in sensor lab</button></div>`);
+}
+$("#sheet").addEventListener("click",e=>{
+  const a=e.target.closest("[data-act]");if(!a)return;
+  if(a.dataset.act==="close")select(null);
+  if(a.dataset.act==="test"){adopt(sel);goTab("lab")}
+});
+
+/* ---------- floors, list, search ---------- */
+function renderFloors(){
+  setH($("#floors"),Object.keys(FLOORS).map(Number).sort((a,b)=>b-a).map(f=>`<button data-floor="${f}" aria-pressed="${f===floor}" aria-label="Floor ${f}">${f}</button>`).join(""));
+}
+$("#floors").addEventListener("click",e=>{const b=e.target.closest("[data-floor]");if(!b)return;floor=+b.dataset.floor;select(null);renderFloors();drawFloor();renderSummary()});
+function renderSummary(){
+  const fs=seats.filter(s=>s.sp.floor===floor);
+  $("#sumA").textContent=`${freeSeats(fs)} of ${totalSeats(fs)} seats free`;
+  $("#sumB").textContent=floorName(floor);
+}
+function renderList(){
+  const rows=Object.keys(FLOORS).map(Number).map(f=>{
+    const fs=seats.filter(s=>s.sp.floor===f),tables=spaces.filter(s=>s.floor===f&&s.type==="table"),rooms=spaces.filter(s=>s.floor===f&&s.type==="room");
+    return{f,free:freeSeats(fs),tot:totalSeats(fs),t:tables.filter(t=>freeSeats(t.seats)>0).length,r:rooms.filter(r=>r.seats[0].st==="free").length};
+  }).sort((a,b)=>b.free/b.tot-a.free/a.tot);
+  setH($("#list"),rows.map(r=>`<button class="row" data-goto="${r.f}">
+    <span class="row-top"><span><b>${FLOORS[r.f].name}</b><br><span class="muted">Floor ${r.f} · ${r.t} tables with space · ${r.r} ${r.r===1?"room":"rooms"} free</span></span><span class="count">${r.free} <small>of ${r.tot}</small></span></span>
+    <span class="track"><i style="width:${Math.round((1-r.free/r.tot)*100)}%"></i></span></button>`).join(""));
+}
+$("#list").addEventListener("click",e=>{const b=e.target.closest("[data-goto]");if(!b)return;floor=+b.dataset.goto;goTab("map");renderFloors();drawFloor();renderSummary();const[w,h]=mapSize();flyTo(500,500,Math.min(w,h)/1000)});
+$("#chips").addEventListener("click",e=>{
+  const b=e.target.closest("[data-f]");if(!b)return;filter=b.dataset.f;
+  document.querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed",c===b));
+  select(null);updateMap();
+});
+$("#q").addEventListener("input",e=>{
+  const v=e.target.value.trim().toLowerCase(),box=$("#results");
+  if(!v){box.hidden=true;return}
+  const hits=spaces.filter(s=>(`${s.name} block ${s.block} floor ${s.floor} ${FLOORS[s.floor].name}`).toLowerCase().includes(v)).sort((a,b)=>freeSeats(b.seats)-freeSeats(a.seats)).slice(0,8);
+  box.innerHTML=hits.length?hits.map(s=>`<button data-sp="${s.id}"><span>${s.name}</span><small>Floor ${s.floor}${s.type==="table"?` · ${freeSeats(s.seats)} free`:` · ${s.seats[0].st==="free"?"free":s.seats[0].st==="occ"?"taken":"offline"}`}</small></button>`).join(""):`<button disabled><span>No space matches "${v.replace(/[<>&]/g,"")}". Try "library" or "Block B".</span></button>`;
+  box.hidden=false;
+});
+$("#results").addEventListener("click",e=>{const b=e.target.closest("[data-sp]");if(!b)return;$("#results").hidden=true;$("#q").value="";select(byId[b.dataset.sp])});
+
+/* ---------- sensor lab ---------- */
+function buildLab(){
+  const sp=target_sp;
+  const picks=[[demoDesk,"Single desk sensor"],[demoTable,"Group table sensor"]];
+  setH($("#labPick"),picks.map(([p,l])=>`<button class="chip" data-lab="${p.id}" aria-pressed="${p===sp}">${l}</button>`).join("")+(picks.some(p=>p[0]===sp)?"":`<button class="chip" aria-pressed="true">${sp.name}</button>`));
+  if(sp.type==="table"){
+    const m=sp.seats.length/2,z=s=>`<button class="zone" data-zone="${s.i}"></button>`;
+    setH($("#labBody"),`<div class="rig"><div class="device"><div class="unit long">studyspace<span class="led" id="led"></span></div></div><div class="rig-state"><b id="rigName"></b><span class="pill" id="rigPill"></span></div></div>
+    <div class="zones"><p class="muted">Tap a seat zone to seat a student or have them leave. A student who leaves stays counted until the inactivity timer ends.</p><div class="zgrid" style="grid-template-columns:repeat(${m},minmax(0,1fr))">${sp.seats.slice(0,m).map(z).join("")}<div class="board" aria-hidden="true"></div>${sp.seats.slice(m).map(z).join("")}</div></div>
+    <div class="ctrl"><button class="btn small" data-do="skip">Skip 10 minutes</button><button class="btn small" data-do="reset">Empty the table</button></div>`);
+  }else{
+    setH($("#labBody"),`<div class="rig"><div class="device"><div class="unit">studyspace<span class="led" id="led"></span></div></div><div class="rig-state"><b id="rigName"></b><span class="pill" id="rigPill"></span><div class="meter"><i id="meter"></i></div><span class="mono" id="rigTimer"></span></div></div>
+    <div class="ctrl">
+      <button class="btn" data-do="press">Press the desk button</button>
+      <button class="btn" data-p="active">Sit down, no button</button>
+      <button class="btn" data-p="still">Study very still</button>
+      <button class="btn" data-p="away">Walk away, forget button</button>
+      <button class="btn small" data-do="skip" style="grid-column:1/-1">Skip 10 minutes</button>
+    </div>`);
+  }
+}
+function updateLab(){
+  const sp=target_sp,s0=sp.seats[0],fr=freeSeats(sp.seats),tot=sp.seats.length;
+  const anyOcc=sp.seats.some(s=>s.st==="occ");
+  const led=$("#led");if(!led)return;led.className="led"+(anyOcc?" occ":"");
+  $("#rigName").textContent=sp.name;
+  const pill=$("#rigPill");
+  if(sp.type==="table"){
+    pill.className="pill "+(fr?"free":"occ");pill.textContent=`${tot-fr} of ${tot} seats occupied · ${fr} available`;
+    sp.seats.forEach(s=>{const z=document.querySelector(`[data-zone="${s.i}"]`);if(!z)return;z.className="zone"+(s.st==="occ"?" occ":"");
+      setH(z,`Seat ${s.i+1}<small>${s.st==="free"?"Free":s.present==="active"?"Student here":`Releases in ${Math.max(0,threshold-(T-s.last))} min`}</small>`)});
+  }else{
+    pill.className="pill "+s0.st;pill.textContent=s0.st==="free"?"Available":"Occupied";
+    const idle=s0.st==="occ"?T-s0.last:0;
+    $("#meter").style.width=Math.min(100,idle/threshold*100)+"%";
+    $("#rigTimer").textContent=s0.st==="occ"?`${idle} of ${threshold} min without activity`:"Timer stopped";
+    document.querySelectorAll("[data-p]").forEach(b=>b.setAttribute("aria-pressed",s0.st==="occ"&&b.dataset.p===s0.present));
+  }
+}
+$("#labPick").addEventListener("click",e=>{const b=e.target.closest("[data-lab]");if(b&&byId[b.dataset.lab]!==target_sp)adopt(byId[b.dataset.lab])});
+$("#labBody").addEventListener("click",e=>{
+  const sp=target_sp,s=sp.seats[0],z=e.target.closest("[data-zone]"),d=e.target.closest("[data-do]"),p=e.target.closest("[data-p]");
+  if(z){const q=sp.seats[+z.dataset.zone];
+    if(q.st==="free"){q.present="active";occupy(q,"sensor")}
+    else if(q.present==="active"){q.present="away";logEv(q,"student left, inactivity timer running")}
+    else{q.present="active";q.last=T;logEv(q,"activity detected, timer reset")}
+  }
+  if(d&&d.dataset.do==="press"){
+    if(s.st==="occ")release(s,"button");else{s.present="active";occupy(s,"button")}
+  }
+  if(d&&d.dataset.do==="reset")sp.seats.forEach(q=>{q.st="free";q.present="away"});
+  if(d&&d.dataset.do==="skip"){for(let i=0;i<10;i++)step();logEv(sp.seats[0],"skipped 10 minutes")}
+  if(p){const v=p.dataset.p;
+    if(v==="away"){if(s.st==="occ"){s.present="away";logEv(s,"student left without pressing, timer running")}}
+    else{if(s.st==="free")occupy(s,"sensor");s.present=v;if(v==="still")logEv(s,"student present, sensor sees no movement")}
+  }
+  renderAll();
+});
+$("#thr").addEventListener("input",e=>{threshold=+e.target.value;$("#thrV").textContent=threshold+" min";renderAll()});
+
+/* ---------- insights ---------- */
+function renderInsights(){
+  const occ=live.filter(s=>s.st==="occ").length,now=Math.round(occ/live.length*100);
+  const rel=stats.button+stats.auto;
+  setH($("#kpis"),[[now+"%","of spaces in use now"],[stats.auto,"released by sensors today"],[rel?Math.round(stats.auto/rel*100)+"%":"–","of releases had no button press"]].map(k=>`<div class="kpi"><b>${k[0]}</b><span>${k[1]}</span></div>`).join(""));
+  const W=520,H=150,L=30,B=20,xs=[];for(let t=480;t<=1320;t+=30)xs.push(t);
+  const bw=(W-L)/xs.length;
+  let g=[0,50,100].map(v=>{const y=(H-B)-(H-B-8)*v/100;return`<line class="c-grid" x1="${L}" x2="${W}" y1="${y}" y2="${y}"/><text class="c-t" x="${L-6}" y="${y+3}" text-anchor="end">${v}%</text>`}).join("");
+  xs.forEach((t,i)=>{
+    const v=hist[t];
+    if(v!=null){const h=(H-B-8)*v;g+=`<rect class="c-bar" x="${L+i*bw+1}" y="${H-B-h}" width="${Math.max(1,bw-2)}" height="${h}" rx="2"/>`}
+    if(t%120===0)g+=`<text class="c-t" x="${L+i*bw+bw/2}" y="${H-5}" text-anchor="middle">${fmt(t)}</text>`;
+  });
+  setH($("#chart"),`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Campus occupancy by half hour today">${g}</svg>`);
+  const rows=Object.keys(FLOORS).map(Number).sort((a,b)=>b-a).flatMap(f=>BLOCKS.map(b=>{const l=seats.filter(s=>s.sp.floor===f&&s.sp.block===b.k&&isSeat(s)&&s.st!=="off");return{n:`Floor ${f}, Block ${b.k}`,v:l.filter(s=>s.st==="occ").length/l.length}})).sort((a,b)=>b.v-a.v);
+  const show=[...rows.slice(0,3),...rows.slice(-3)];
+  setH($("#floorBars"),`<p class="muted" style="margin-bottom:8px">Most and least used areas right now</p><div style="display:grid;gap:7px">${show.map(r=>`<div style="display:grid;grid-template-columns:118px minmax(0,1fr) 38px;gap:8px;align-items:center;font-size:13px"><span>${r.n}</span><span class="meter"><i style="width:${Math.round(r.v*100)}%"></i></span><span class="mono" style="text-align:right">${Math.round(r.v*100)}%</span></div>`).join("")}</div>`);
+  const top=rows[0],low=rows[rows.length-1];
+  $("#insNote").textContent=`${top.n} is at ${Math.round(top.v*100)}% while ${low.n} is at ${Math.round(low.v*100)}%. This is the kind of gap a campus manager could act on.`;
+}
+$("#exam").addEventListener("change",e=>{exam=e.target.checked;for(let i=0;i<20;i++)step();renderAll()});
+
+/* ---------- shell ---------- */
+function goTab(t){
+  const wide=matchMedia("(min-width:861px)").matches;
+  document.querySelectorAll("#nav button").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===t));
+  const toList=t==="list";
+  if(t==="map"||t==="list"||!wide){
+    $("#v-map").classList.toggle("on",!toList);$("#v-list").classList.toggle("on",toList);
+  }
+  $("#bench").classList.toggle("on",t==="lab"||t==="ins");
+  $("#s-lab").classList.toggle("on",t==="lab");$("#s-ins").classList.toggle("on",t==="ins");
+  if(t==="list"&&!$("#sheet").hidden)select(null);
+  if(t==="map"){requestAnimationFrame(applyCam)}
+  placeTip();
+}
+$("#nav").addEventListener("click",e=>{const b=e.target.closest("[data-tab]");if(b)goTab(b.dataset.tab)});
+$("#infoBtn").onclick=()=>{$("#dialog").hidden=false};
+$("#dialogClose").onclick=()=>{$("#dialog").hidden=true};
+function renderAll(){
+  $("#clock").textContent=fmt(T);
+  updateMap();renderSummary();renderList();placeTip();updateLab();renderInsights();
+  if(sel)renderSheet();
+}
+addEventListener("resize",applyCam);
+
+/* ---------- real MazeMap base map ---------- */
+const CAMPUS=10, CENTER={lng:10.768052,lat:59.948499};
+const keep={flyTo,applyCam,drawFloor,updateMap,placeTip};
+let mm=null, mmReady=false, adj={x:0,y:0,r:0,s:100}, pos={};
+const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+adj=store.get("ss2-adj",adj);pos=store.get("ss2-pos",pos);
+const NEAR=17.9, CAMPUS_ZOOM=17, BLOCK_ZOOM=18.1;
+const ov=$("#ov"), ctx=ov.getContext("2d");
+/* Building fitted from a MazeMap screenshot: world 80..920 maps onto the real outline, in metres from CENTER. */
+const FIT={e0:-55,n0:40.4,Ex:113,Ey:33.3,Sx:33.3,Sy:-133.3};
+function ll(x,y){
+  const u=(x-80)/840,v=(y-80)/840,cE=FIT.e0+(FIT.Ex+FIT.Sx)/2,cN=FIT.n0+(FIT.Ey+FIT.Sy)/2;
+  const k=adj.s/100,a=adj.r*Math.PI/180,dx=(FIT.e0+u*FIT.Ex+v*FIT.Sx-cE)*k,dy=(FIT.n0+u*FIT.Ey+v*FIT.Sy-cN)*k;
+  const e=cE+dx*Math.cos(a)-dy*Math.sin(a)+adj.x,n=cN+dx*Math.sin(a)+dy*Math.cos(a)+adj.y;
+  return{lng:CENTER.lng+e/(111320*Math.cos(CENTER.lat*Math.PI/180)),lat:CENTER.lat+n/111320};
+}
+function seatLL(s){
+  const p=ll(s.x,s.y),o=pos[s.sp.id];if(!o)return p;
+  const c=ll(s.sp.x,s.sp.y);return{lng:p.lng+o[0]-c.lng,lat:p.lat+o[1]-c.lat};
+}
+const cssv=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let queued=false;
+function draw(){if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;paint()})}
+function paint(){
+  if(!mmReady)return;
+  const r=mapEl.getBoundingClientRect(),d=devicePixelRatio||1;
+  if(ov.width!==Math.round(r.width*d)||ov.height!==Math.round(r.height*d)){ov.width=r.width*d;ov.height=r.height*d}
+  ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,r.width,r.height);
+  const col={free:cssv("--free"),occ:cssv("--taken"),off:cssv("--off")},far=mm.getZoom()<NEAR,R=Math.max(5,Math.min(11,(mm.getZoom()-16.1)*3));
+  paintBubbles(far);
+  $("#backBtn").hidden=far;
+  if(!far){
+    const tw=Math.max(6,R*2.1);
+    for(const sp of spaces){
+      if(sp.floor!==floor||sp.type!=="table")continue;
+      const f=sp.seats.length/2,top=sp.seats.slice(0,f),bot=sp.seats.slice(f),mid=(a,b)=>{const p=mm.project(seatLL(a)),q=mm.project(seatLL(b));return[(p.x+q.x)/2,(p.y+q.y)/2]};
+      const l=mid(top[0],bot[0]),e=mid(top[f-1],bot[f-1]);
+      ctx.globalAlpha=filter!=="all"&&filter!=="table"?.15:1;
+      ctx.strokeStyle=cssv("--table");ctx.lineWidth=tw;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(...l);ctx.lineTo(...e);ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+    for(const s of seats){
+      if(s.sp.floor!==floor)continue;
+      const p=mm.project(seatLL(s));
+      ctx.globalAlpha=filter!=="all"&&s.sp.type!==filter?.15:1;
+      ctx.beginPath();ctx.arc(p.x,p.y,R,0,7);
+      if(s.st==="off"){ctx.strokeStyle=col.off;ctx.lineWidth=2;ctx.stroke()}
+      else{ctx.fillStyle=col[s.st];ctx.fill();ctx.strokeStyle="#fff";ctx.lineWidth=1.5;ctx.stroke()}
+      if(s.st==="occ"){ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(p.x,p.y,R*.33,0,7);ctx.fill()}
+      if(sel===s.sp){ctx.strokeStyle=cssv("--accent");ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(p.x,p.y,R+4,0,7);ctx.stroke()}
+    }
+    ctx.globalAlpha=1;
+  }
+  placeTipReal();
+}
+function paintBubbles(far){
+  const box=$("#bbl");box.hidden=!far;if(!far)return;
+  for(const b of BLOCKS){
+    const el=box.querySelector(`[data-b="${b.k}"]`),l=seats.filter(s=>s.sp.floor===floor&&s.sp.block===b.k&&(filter==="all"||s.sp.type===filter));
+    const p=mm.project(ll(b.ox+SIZE/2,b.oy+SIZE/2));
+    el.style.left=p.x+"px";el.style.top=p.y+"px";
+    const n=filter==="room"?l.filter(s=>s.st==="free").length:freeSeats(l),w=filter==="room"?(n===1?"room free":"rooms free"):(n===1?"seat free":"seats free");
+    setH(el,`<b>${n}</b><span>${w}</span>`);el.setAttribute("aria-label",`Block ${b.k}: ${n} ${w}. Zoom in`);
+  }
+}
+function placeTipReal(){
+  const t=$("#tip");
+  if(!sel||sel.floor!==floor||mm.getZoom()<NEAR||!$("#v-map").classList.contains("on")){t.hidden=true;return}
+  const fr=freeSeats(sel.seats),tot=sel.seats.length;
+  setH(t,`<b>${sel.name}</b>${sel.type==="table"?`${tot-fr} / ${tot} occupied`:sel.seats[0].st==="occ"?"Occupied":sel.seats[0].st==="off"?"Unavailable":"Available"}`);
+  const ys=sel.seats.map(s=>mm.project(seatLL(s)));
+  t.style.left=Math.max(80,Math.min(mapEl.clientWidth-80,ys.reduce((a,p)=>a+p.x,0)/ys.length))+"px";
+  t.style.top=(Math.min(...ys.map(p=>p.y))-12)+"px";t.hidden=false;
+}
+function useReal(){
+  applyCam=()=>draw();updateMap=()=>draw();placeTip=()=>draw();
+  drawFloor=()=>{if(mmReady&&mm.zLevel!==floor)try{mm.setZLevel(floor)}catch(e){}draw()};
+  flyTo=(x,y,s,f=.5)=>{if(!mmReady)return;const c=x===500&&y===500?ll(500,500):sel?seatLL(sel.seats[0]):ll(x,y);
+    mm.flyTo({center:c,zoom:s<.62?CAMPUS_ZOOM:Math.max(mm.getZoom(),18.8),offset:[0,(f-.5)*mapEl.clientHeight],duration:400})};
+  $("#zin").onclick=()=>mm.zoomIn();$("#zout").onclick=()=>mm.zoomOut();
+}
+function fallback(msg){
+  if(!document.body.classList.contains("real")&&mm===null&&!msg)return;
+  document.body.classList.remove("real");$("#mm").hidden=true;ov.hidden=true;$("#bbl").hidden=true;$("#backBtn").hidden=true;mmReady=false;
+  ({flyTo,applyCam,drawFloor,updateMap,placeTip}=keep);
+  $("#zin").onclick=()=>zoomAt(1.4);$("#zout").onclick=()=>zoomAt(.7);
+  const n=$("#notice");n.textContent=msg;n.hidden=false;drawFloor();
+}
+function onMapClick(e){
+  const q=e.point;
+  if($("#aMove").checked&&sel){pos[sel.id]=[e.lngLat.lng,e.lngLat.lat];store.set("ss2-pos",pos);draw();return}
+  if(mm.getZoom()<NEAR)return;
+  let best=null,bd=22;
+  for(const s of seats){if(s.sp.floor!==floor)continue;if(filter!=="all"&&s.sp.type!==filter)continue;const p=mm.project(seatLL(s)),d=Math.hypot(p.x-q.x,p.y-q.y);if(d<bd){bd=d;best=s}}
+  select(best?best.sp:null);
+}
+function initReal(){
+  if(!window.Mazemap)return fallback("MazeMap could not load, so this is the schematic plan. Check your internet connection and reload.");
+  document.body.classList.add("real");$("#mm").hidden=false;ov.hidden=false;useReal();
+  sel=null;
+  $("#bbl").innerHTML=BLOCKS.map(b=>`<button class="mbub" data-b="${b.k}"></button>`).join("");
+  $("#bbl").addEventListener("click",e=>{const t=e.target.closest("[data-b]");if(!t||!mmReady)return;const b=BLOCKS.find(x=>x.k===t.dataset.b);mm.flyTo({center:ll(b.ox+SIZE/2,b.oy+SIZE/2),zoom:BLOCK_ZOOM,duration:600})});
+  $("#backBtn").onclick=()=>{select(null);mm.flyTo({center:ll(500,500),zoom:CAMPUS_ZOOM,duration:600})};
+  const timer=setTimeout(()=>{if(!mmReady)fallback("MazeMap did not respond, so this is the schematic plan. Try reloading, or host the file on a web address.")},15000);
+  try{
+    mm=new Mazemap.Map({container:"mm",campuses:CAMPUS,center:ll(500,500),zoom:CAMPUS_ZOOM,zLevel:floor});
+    mm.on("load",()=>{
+      clearTimeout(timer);mmReady=true;
+      mm.on("render",draw);mm.on("move",draw);mm.on("click",onMapClick);
+      mm.on("zlevel",()=>{if(FLOORS[mm.zLevel]&&mm.zLevel!==floor){floor=mm.zLevel;select(null);renderFloors();renderSummary()}draw()});
+      new ResizeObserver(()=>{mm.resize();draw()}).observe(mapEl);
+      mm.flyTo({center:ll(500,500),zoom:CAMPUS_ZOOM,duration:0});draw();
+    });
+    mm.on("error",e=>console.warn("MazeMap",e&&e.error));
+  }catch(e){clearTimeout(timer);fallback("MazeMap could not start, so this is the schematic plan.")}
+}
+function bindAlign(){
+  const map={aX:"x",aY:"y",aR:"r",aS:"s"};
+  for(const id in map){const el=$("#"+id);el.value=adj[map[id]];el.addEventListener("input",()=>{adj[map[id]]=+el.value;store.set("ss2-adj",adj);draw()})}
+  $("#aReset").onclick=()=>{adj={x:0,y:0,r:0,s:100};pos={};store.set("ss2-adj",adj);store.set("ss2-pos",pos);for(const id in map)$("#"+id).value=adj[map[id]];draw()};
+  $("#aCopy").onclick=()=>{const o=$("#aOut");o.value=JSON.stringify({adj,pos});o.hidden=false;o.select();navigator.clipboard&&navigator.clipboard.writeText(o.value).catch(()=>{})};
+}
+bindAlign();
+
+/* ---------- start ---------- */
+function start(){
+  target_sp=null;
+  adopt(demoDesk);
+  renderFloors();drawFloor();renderSummary();
+  const sp=demoTable;if(!mm)sel=sp;
+  cam.s=.86;const[w,h]=mapSize();cam.x=w/2-sp.x*cam.s-60;cam.y=h*.42-sp.y*cam.s;applyCam();
+  updateMap();renderAll();
+  setInterval(()=>{step();renderAll()},2000);
+}
+initReal();
+start();
+</script>
+</body></html>
