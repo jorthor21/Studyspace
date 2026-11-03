@@ -815,7 +815,8 @@ const friends=[
   {id:"f1",name:"Ana",seat:byIdSeat("A5-T2#1"),see:false},
   {id:"f2",name:"Anna",seat:byIdSeat("B4-T3#2"),see:false},
   {id:"f3",name:"Nadia",seat:byIdSeat("C5-D04#0"),see:false},
-  {id:"f4",name:"Mira",seat:byIdSeat("B5-T1#0"),see:false}
+  {id:"f4",name:"Mira",seat:byIdSeat("B5-T1#0"),see:false},
+  {id:"f5",name:"Jørgen",seat:byIdSeat("C4-T2#0"),see:false}
 ];
 function byIdSeat(id){return seats.find(s=>s.id===id)||null}
 friends.forEach(f=>{if(f.seat){f.seat.st="occ";f.seat.manual=true;f.seat.present="active";f.seat.last=T}});
