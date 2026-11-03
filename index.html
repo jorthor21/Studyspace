@@ -206,6 +206,7 @@ details.align summary{font-weight:600;cursor:pointer}
 .align input[type=range]{width:100%;accent-color:var(--accent)}
 .align .toggle{display:flex}
 html{height:100%}
+body{margin:0}
 #bbl{position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden}
 .mbub{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;min-width:68px;min-height:46px;padding:4px 10px;border-radius:12px;background:var(--ink);color:var(--surface);display:grid;line-height:1.15;box-shadow:0 3px 10px rgba(10,20,30,.25)}
 .mbub b{font-size:17px;font-variant-numeric:tabular-nums}
@@ -225,6 +226,18 @@ html{height:100%}
 .durs{display:flex;gap:6px}
 .bookbar{margin:8px 10px 0;width:calc(100% - 20px);min-height:44px;border-radius:12px;background:var(--ink);color:var(--surface);padding:8px 12px;display:flex;justify-content:space-between;gap:10px;align-items:center;text-align:left;font-size:13px;font-weight:600}
 .bookbar span:last-child{font-weight:400;white-space:nowrap;font-variant-numeric:tabular-nums}
+.nav{display:flex;gap:4px;position:relative;z-index:21}
+.sheet{bottom:calc(55px + env(safe-area-inset-bottom,0px))}
+@media (min-width:861px){.sheet{bottom:61px}}
+.nav button{padding:0;white-space:nowrap}
+.nav button .n{display:inline-grid;place-items:center;min-width:18px;height:18px;margin-left:4px;padding:0 4px;border-radius:9px;background:var(--accent);color:var(--on-ink);font-size:11px;font-variant-numeric:tabular-nums}
+@media (min-width:861px){.nav [data-tab="lab"],.nav [data-tab="ins"]{display:none}.nav{padding-bottom:12px}}
+@media (max-width:400px){.nav button{font-size:12px}}
+.bk{display:grid;gap:9px;padding:13px 0;border-bottom:1px solid var(--line)}
+.bk-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.bk-top b{font-size:15px}
+.list h3{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-top:10px}
+.empty{display:grid;gap:12px;padding:28px 0;justify-items:start}
 </style>
 </head><body>
 
@@ -266,6 +279,11 @@ html{height:100%}
       <div class="list" id="list"></div>
     </div>
 
+    <div class="view" id="v-book">
+      <div class="top"><h1>My bookings</h1><p class="sub">Tables you have booked today</p></div>
+      <div class="list" id="bookList"></div>
+    </div>
+
     <div class="sheet" id="sheet" hidden></div>
     <div class="dialog" id="dialog" hidden>
       <div class="sheet-head"><h2>About this prototype</h2><button class="close" id="dialogClose" aria-label="Close">×</button></div>
@@ -278,6 +296,7 @@ html{height:100%}
     <nav class="nav" id="nav" aria-label="Main">
       <button data-tab="map" aria-current="true">Map</button>
       <button data-tab="list">Floors</button>
+      <button data-tab="book">Bookings<span class="n" id="navN" hidden></span></button>
       <button data-tab="lab">Sensors</button>
       <button data-tab="ins">Insights</button>
     </nav>
@@ -371,7 +390,8 @@ const totalSeats=(arr)=>arr.reduce((n,s)=>n+(s.st!=="off"&&isSeat(s)?1:0),0);
 
 /* ---------- occupancy engine ---------- */
 const HOLD=15;
-let booking=null, bookForm=null;
+let bookings=[], past=[], bookForm=null, bookSeq=0;
+const myBook=sp=>bookings.find(b=>b.sp===sp);
 let T=8*60, threshold=30, exam=false, listening=false;
 const stats={button:0,auto:0,falseRel:0};
 const hist={};
@@ -393,11 +413,17 @@ function release(s,why){
   if(why==="button"){stats.button++;logEv(s,"button pressed, available now")}
   else{stats.auto++;logEv(s,`no activity for ${threshold} min, released automatically`)}
 }
-function clearBooking(){booking.seats.forEach(s=>{if(s.st==="res")s.st="free"});booking=null}
+function endBooking(b,label){
+  b.seats.forEach(q=>{if(q.st==="res")q.st="free"});
+  bookings=bookings.filter(x=>x!==b);past.unshift({...b,label,at:T});
+}
 function step(){
   T++;
-  if(booking&&!booking.seats.some(s=>s.st==="res"))booking=null;
-  if(booking&&T>=booking.until){const sp=booking.sp;clearBooking();showNote(`Your booking at ${sp.name} ended because nobody checked in.`)}
+  for(const b of [...bookings]){
+    if(b.status==="held"&&!b.seats.some(q=>q.st==="res"))bookings=bookings.filter(x=>x!==b);
+    else if(b.status==="held"&&T>=b.until){endBooking(b,"Not checked in");showNote(`Your booking at ${b.sp.name} ended because nobody checked in.`)}
+    else if(b.status==="in"&&T>=b.endAt)endBooking(b,"Finished");
+  }
   for(const s of live){
     if(s.st!=="occ")continue;
     if(s.manual){if(s.present==="active")s.last=T}
@@ -592,13 +618,13 @@ function renderSheet(){
     pill=`<span class="pill ${one.st}">${one.st==="free"?"Available":one.st==="occ"?"Occupied":"Unavailable"}</span>`;
     detail=`<p class="muted">${statusText(one)}</p>`;
   }
-  const mine=booking&&booking.sp===sp;
-  if(mine)pill=`<span class="pill res">Booked by you · ${booking.seats.length} ${booking.seats.length===1?"seat":"seats"} · ${booking.dur} h</span>`;
+  const mine=myBook(sp);
+  if(mine)pill=`<span class="pill res">${mine.status==="in"?"Checked in":"Booked by you"} · ${mine.seats.length} ${mine.seats.length===1?"seat":"seats"} · ${mine.dur} h</span>`;
   const where=`Block ${sp.block} · ${FLOORS[sp.floor].name}, floor ${sp.floor}${sp.cap?` · ${sp.cap} seats`:""}`;
   const url=`https://use.mazemap.com/#v=1&campusid=10&zlevel=${sp.floor}&center=10.768052,59.948499&zoom=18`;
   let primary=`<a class="btn primary" href="${url}" target="_blank" rel="noopener">Open in MazeMap</a>`,body;
-  if(sp.type==="table"&&fr>0&&!mine)primary=booking?`<button class="btn ghost" data-act="mine">View your booking</button>`:`<button class="btn primary" data-act="book">Book table</button>`;
-  if(bookForm&&!booking&&fr>0){
+  if(sp.type==="table"&&fr>0&&!mine)primary=`<button class="btn primary" data-act="book">Book table</button>`;
+  if(bookForm&&!mine&&fr>0){
     bookForm.n=Math.min(bookForm.n,fr);
     body=`<div class="form">${pill}
       <div class="field"><span>Seats</span><div class="stepper"><button data-act="less" aria-label="Fewer seats" ${bookForm.n<=1?"disabled":""}>−</button><b>${bookForm.n}</b><button data-act="more" aria-label="More seats" ${bookForm.n>=fr?"disabled":""}>+</button></div></div>
@@ -606,13 +632,20 @@ function renderSheet(){
       <p class="muted">We hold your seats for ${HOLD} minutes. If you don't check in by then, they become available again.</p>
       <div class="actions"><button class="btn ghost" data-act="back">Back</button><button class="btn primary" data-act="confirm">Confirm booking</button></div></div>`;
   }else if(mine){
-    body=`${pill}${detail}<p class="muted">Check in within ${Math.max(0,booking.until-T)} min to keep your seats.</p>
+    body=mine.status==="in"?`${pill}${detail}<p class="muted">Your booking ends at ${fmt(mine.endAt)}.</p><div class="actions"><button class="btn ghost" data-act="finish">End booking</button></div>`
+      :`${pill}${detail}<p class="muted">Check in within ${Math.max(0,mine.until-T)} min to keep your seats.</p>
       <div class="actions"><button class="btn primary" data-act="checkin">Check in</button><button class="btn ghost" data-act="cancel">Cancel booking</button></div>`;
   }else{
     body=`${pill}${detail}<div class="actions">${primary}<button class="btn ghost" data-act="test">Test in sensor lab</button></div>`;
   }
   setH(sh,`<div class="sheet-head"><div><h2>${sp.name}</h2><p class="muted">${where}</p></div><button class="close" data-act="close" aria-label="Close">×</button></div>
   ${body}`);
+}
+function doBook(b,what){
+  if(!b)return;
+  if(what==="cancel"){endBooking(b,"Cancelled");showNote("Booking cancelled. The seats are available again.")}
+  if(what==="checkin"){b.status="in";b.endAt=T+b.dur*60;b.seats.forEach(q=>{q.st="occ";q.last=T;q.leave=b.endAt;q.forget=false;if(q.manual)q.present="active"});showNote(`You're checked in at ${b.sp.name} for ${b.dur} h.`)}
+  if(what==="finish"){b.seats.forEach(q=>{if(q.st==="occ")release(q,"button")});endBooking(b,"Finished")}
 }
 $("#sheet").addEventListener("click",e=>{
   const a=e.target.closest("[data-act]");if(!a)return;
@@ -623,18 +656,15 @@ $("#sheet").addEventListener("click",e=>{
   if(act==="less")bookForm.n--;
   if(act==="more")bookForm.n++;
   if(act==="dur")bookForm.dur=+a.dataset.h;
-  if(act==="mine"){select(booking.sp);return}
   if(act==="confirm"){
-    const pick=sel.seats.filter(s=>s.st==="free").slice(0,bookForm.n);
-    pick.forEach(s=>{s.st="res"});
-    booking={sp:sel,seats:pick,dur:bookForm.dur,until:T+HOLD};bookForm=null;
-    showNote(`Booked ${pick.length} ${pick.length===1?"seat":"seats"} at ${sel.name}.`);
+    const pick=sel.seats.filter(q=>q.st==="free").slice(0,bookForm.n);
+    pick.forEach(q=>{q.st="res"});
+    bookings.push({id:++bookSeq,sp:sel,seats:pick,dur:bookForm.dur,until:T+HOLD,status:"held",made:T});bookForm=null;
+    showNote(`Booked ${pick.length} ${pick.length===1?"seat":"seats"} at ${sel.name}. Find it in Bookings.`);
   }
-  if(act==="cancel"){clearBooking();showNote("Booking cancelled. The seats are available again.")}
-  if(act==="checkin"){
-    const b=booking;b.seats.forEach(s=>{s.st="occ";s.last=T;s.leave=T+b.dur*60;s.forget=false;if(s.manual)s.present="active"});
-    booking=null;showNote(`You're checked in at ${b.sp.name} for ${b.dur} h.`);
-  }
+  if(act==="cancel")doBook(myBook(sel),"cancel");
+  if(act==="checkin")doBook(myBook(sel),"checkin");
+  if(act==="finish")doBook(myBook(sel),"finish");
   if(act!=="test"){renderAll();return}
   if(a.dataset.act==="test"){adopt(sel);goTab("lab")}
 });
@@ -760,13 +790,12 @@ $("#exam").addEventListener("change",e=>{exam=e.target.checked;for(let i=0;i<20;
 function goTab(t){
   const wide=matchMedia("(min-width:861px)").matches;
   document.querySelectorAll("#nav button").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===t));
-  const toList=t==="list";
-  if(t==="map"||t==="list"||!wide){
-    $("#v-map").classList.toggle("on",!toList);$("#v-list").classList.toggle("on",toList);
+  if(t==="map"||t==="list"||t==="book"){
+    $("#v-map").classList.toggle("on",t==="map");$("#v-list").classList.toggle("on",t==="list");$("#v-book").classList.toggle("on",t==="book");
   }
   $("#bench").classList.toggle("on",t==="lab"||t==="ins");
   $("#s-lab").classList.toggle("on",t==="lab");$("#s-ins").classList.toggle("on",t==="ins");
-  if(t==="list"&&!$("#sheet").hidden)select(null);
+  if((t==="list"||t==="book")&&!$("#sheet").hidden)select(null);
   if(t==="map"){requestAnimationFrame(applyCam)}
   placeTip();
 }
@@ -778,12 +807,26 @@ function showNote(t){
 }
 let noteText="",noteUntil=0;
 function renderBook(){
-  const bar=$("#bookBar");
-  if(booking){bar.hidden=false;setH(bar,`<span>${booking.sp.name} · ${booking.seats.length} ${booking.seats.length===1?"seat":"seats"}</span><span>Check in within ${Math.max(0,booking.until-T)} min</span>`)}
+  const bar=$("#bookBar"),held=bookings.filter(b=>b.status==="held").sort((a,b)=>a.until-b.until)[0];
+  if(held){bar.hidden=false;setH(bar,`<span>${held.sp.name} · ${held.seats.length} ${held.seats.length===1?"seat":"seats"}</span><span>Check in within ${Math.max(0,held.until-T)} min</span>`)}
   else if(noteText&&T<noteUntil){bar.hidden=false;setH(bar,`<span>${noteText}</span>`)}
   else bar.hidden=true;
+  const n=$("#navN");n.hidden=!bookings.length;n.textContent=bookings.length;
+  const where=b=>`Block ${b.sp.block} · ${FLOORS[b.sp.floor].name}, floor ${b.sp.floor}`,seatsTxt=b=>`${b.seats.length} ${b.seats.length===1?"seat":"seats"} · ${b.dur} h`;
+  const card=b=>`<div class="bk"><div class="bk-top"><span><b>${b.sp.name}</b><br><span class="muted">${where(b)}</span></span><span class="pill ${b.status==="in"?"occ":"res"}">${b.status==="in"?"Checked in":"Booked"}</span></div>
+    <p class="muted">${seatsTxt(b)} · ${b.status==="in"?`ends at ${fmt(b.endAt)}`:`check in within ${Math.max(0,b.until-T)} min`}</p>
+    <div class="actions">${b.status==="held"?`<button class="btn primary small" data-bk="${b.id}" data-do="checkin">Check in</button><button class="btn ghost small" data-bk="${b.id}" data-do="cancel">Cancel</button>`:`<button class="btn ghost small" data-bk="${b.id}" data-do="finish">End booking</button>`}<button class="btn ghost small" data-bk="${b.id}" data-do="show">Show on map</button></div></div>`;
+  const old=b=>`<div class="bk"><div class="bk-top"><span><b>${b.sp.name}</b><br><span class="muted">${seatsTxt(b)} · booked ${fmt(b.made)}</span></span><span class="pill off">${b.label}</span></div></div>`;
+  setH($("#bookList"),(bookings.length?bookings.map(card).join(""):`<div class="empty"><p class="muted">You have no active bookings. Choose a table with free seats on the map to book it.</p><button class="btn primary" data-do="find" style="flex:none">Find a table</button></div>`)+(past.length?`<h3>Earlier today</h3>${past.slice(0,10).map(old).join("")}`:""));
 }
-$("#bookBar").addEventListener("click",()=>{if(booking)select(booking.sp)});
+$("#bookBar").addEventListener("click",()=>{if(bookings.length)goTab("book")});
+$("#bookList").addEventListener("click",e=>{
+  const a=e.target.closest("[data-do]");if(!a)return;
+  if(a.dataset.do==="find"){goTab("map");return}
+  const b=bookings.find(x=>x.id===+a.dataset.bk);if(!b)return;
+  if(a.dataset.do==="show"){goTab("map");requestAnimationFrame(()=>select(b.sp));return}
+  doBook(b,a.dataset.do);renderAll();
+});
 function renderAll(){
   renderBook();
   $("#clock").textContent=fmt(T);
