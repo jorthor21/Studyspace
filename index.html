@@ -276,7 +276,9 @@ body{margin:0}
           <button class="chip" data-f="all" aria-pressed="true">All</button>
           <button class="chip" data-f="desk" aria-pressed="false">Desks</button>
           <button class="chip" data-f="table" aria-pressed="false">Group Tables</button>
-          <button class="chip" data-f="room" aria-pressed="false">Rooms</button>
+          <button class="chip" data-f="room" aria-pressed="false">Group Rooms</button>
+          <button class="chip" data-f="cell" aria-pressed="false">Study Cells</button>
+          <button class="chip" data-f="lab" aria-pressed="false">Data Lab</button>
         </div>
       </div>
       <div class="map" id="map">
@@ -298,7 +300,7 @@ body{margin:0}
     </div>
 
     <div class="view" id="v-book">
-      <div class="top"><h1>My bookings</h1><p class="sub">Tables you have booked today</p></div>
+      <div class="top"><h1>My bookings</h1><p class="sub">Spaces you have booked today</p></div>
       <div class="list" id="bookList"></div>
     </div>
 
@@ -372,12 +374,17 @@ const rnd=()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|s
 const pick=(a,b)=>a+Math.floor(rnd()*(b-a+1));
 
 /* ---------- campus model (schematic) ---------- */
+/* B5, B6, C5, C6, BU1 and CU1 follow BI's own room-booking list. U1 is stored as level 0. */
 const FLOORS={
-  5:{name:"Library",desks:2,tables:5,rooms:3,w:1.25},
+  6:{name:"Group rooms and data lab",blocks:"BC",desks:0,tables:0,rooms:3,w:.9,per:{B:{master:2},C:{desks:1,lab:1}}},
+  5:{name:"Library",desks:2,tables:5,rooms:3,w:1.25,per:{B:{cells:4,tableName:"Working area"},C:{cells:4}}},
   4:{name:"Library",desks:2,tables:5,rooms:3,w:1.2},
   2:{name:"Atrium meeting tables",desks:0,tables:3,rooms:3,w:.65},
-  1:{name:"Classroom level",desks:1,tables:3,rooms:2,w:.55}
+  1:{name:"Classroom level",desks:1,tables:3,rooms:2,w:.55},
+  0:{name:"Lower level group rooms",blocks:"BC",desks:0,tables:0,rooms:3,w:.6}
 };
+const fl=f=>f===0?"U1":String(f);
+const CELLS=[[70,362],[115,362],[160,362],[290,362]], MASTER=[[100,100],[215,100]];
 const BLOCKS=[{k:"B",ox:80,oy:80,fx:0,fy:0,w:1},{k:"A",ox:530,oy:80,fx:1,fy:0,w:1.2},{k:"C",ox:80,oy:530,fx:0,fy:1,w:.7}];
 const SIZE=390, TBL=[[100,95,6],[215,95,4],[100,190,6],[100,285,4],[215,335,6]], ROOMS=[[300,120],[300,190],[300,260]];
 const spaces=[],byId={},seats=[];
@@ -386,28 +393,42 @@ function addSpace(sp,pts,occOff){
   spaces.push(sp);byId[sp.id]=sp;
 }
 for(const f of Object.keys(FLOORS).map(Number)){
-  const c=FLOORS[f];
   for(const b of BLOCKS){
+    const base=FLOORS[f];if(base.blocks&&!base.blocks.includes(b.k))continue;
+    const c={...base,...((base.per||{})[b.k]||{})};
     const P=(x,y)=>[b.ox+(b.fx?SIZE-x:x),b.oy+(b.fy?SIZE-y:y)];
     let n=1;
-    const desk=(x,y)=>{const num=String(n++).padStart(2,"0"),p=P(x,y);addSpace({id:`${b.k}${f}-D${num}`,type:"desk",name:`Desk ${b.k}${f}-${num}`,floor:f,block:b.k,w:b.w*c.w,x:p[0],y:p[1]},[p],rnd()<.02)};
+    const desk=(x,y)=>{const num=String(n++).padStart(2,"0"),p=P(x,y);addSpace({id:`${b.k}${fl(f)}-D${num}`,type:"desk",name:`Desk ${b.k}${fl(f)}-${num}`,floor:f,block:b.k,w:b.w*c.w,x:p[0],y:p[1]},[p],rnd()<.02)};
     if(c.desks>=1)for(let x=26;x<=364;x+=34)desk(x,26);
     if(c.desks>=2)for(let y=60;y<=364;y+=34)desk(26,y);
     TBL.slice(0,c.tables).forEach((t,i)=>{
       const p=P(t[0],t[1]),m=t[2]/2,pts=[];
       for(const dy of[-27,27])for(let j=0;j<m;j++)pts.push([p[0]+(j-(m-1)/2)*26,p[1]+dy]);
       const demo=b.k==="A"&&f===4&&i===0;
-      addSpace({id:`${b.k}${f}-T${i+1}`,type:"table",name:demo?"Group Table A":`Group Table ${b.k}${f}-${i+1}`,floor:f,block:b.k,w:b.w*c.w*1.15,x:p[0],y:p[1],tw:m*26+8},pts);
+      addSpace({id:`${b.k}${fl(f)}-T${i+1}`,type:"table",name:demo?"Group Table A":`${c.tableName||"Group Table"} ${b.k}${fl(f)}-${i+1}`,floor:f,block:b.k,w:b.w*c.w*1.15,x:p[0],y:p[1],tw:m*26+8},pts);
     });
     ROOMS.slice(0,c.rooms).forEach((r,i)=>{
       const p=P(r[0]+36,r[1]+30);
-      addSpace({id:`${b.k}${f}-R${i+1}`,type:"room",name:`Group Room ${b.k}${f}-${i+1}`,floor:f,block:b.k,w:b.w*c.w,x:p[0],y:p[1],cap:[6,8,4][i]},[p]);
+      addSpace({id:`${b.k}${fl(f)}-R${i+1}`,type:"room",name:`Group Room ${b.k}${fl(f)}-${i+1}`,floor:f,block:b.k,w:b.w*c.w,x:p[0],y:p[1],cap:[6,8,4][i]},[p]);
     });
+    MASTER.slice(0,c.master||0).forEach((r,i)=>{
+      const p=P(r[0],r[1]);
+      addSpace({id:`${b.k}${fl(f)}-M${i+1}`,type:"room",master:true,name:`Master Group Room ${b.k}${fl(f)}-${i+1}`,floor:f,block:b.k,w:b.w*c.w,x:p[0],y:p[1],cap:6},[p]);
+    });
+    CELLS.slice(0,c.cells||0).forEach((r,i)=>{
+      const p=P(r[0],r[1]);
+      addSpace({id:`${b.k}${fl(f)}-S${i+1}`,type:"cell",name:`Study Cell ${b.k}${fl(f)}-${i+1}`,floor:f,block:b.k,w:b.w*c.w*1.3,x:p[0],y:p[1]},[p]);
+    });
+    if(c.lab){
+      const p=P(100,240),pts=[];
+      for(const dy of[-27,27])for(let j=0;j<4;j++)pts.push([p[0]+(j-1.5)*26,p[1]+dy]);
+      addSpace({id:`${b.k}${fl(f)}-L1`,type:"lab",name:`Data Lab ${b.k}${fl(f)}`,floor:f,block:b.k,w:b.w*c.w*.8,x:p[0],y:p[1],tw:112,note:"Morningstar / LSEG Workspace"},pts);
+    }
   }
 }
 const live=seats.filter(s=>s.st!=="off");
 const isSeat=s=>s.sp.type!=="room";
-const floorName=f=>`${FLOORS[f].name} · Floor ${f}`;
+const floorName=f=>`${FLOORS[f].name} · Floor ${fl(f)}`;
 const freeSeats=(arr)=>arr.reduce((n,s)=>n+(s.st==="free"&&isSeat(s)?1:0),0);
 const totalSeats=(arr)=>arr.reduce((n,s)=>n+(s.st!=="off"&&isSeat(s)?1:0),0);
 
@@ -502,7 +523,7 @@ function drawFloor(){
   svgEl("rect",{x:40,y:40,width:920,height:920,rx:30,fill:"var(--void)"},world);
   const lab=(x,y,t,c="street-label",extra={})=>{const e=svgEl("text",{x,y,class:c,...extra},world);e.textContent=t;return e};
   for(const b of BLOCKS){
-    svgEl("rect",{x:b.ox,y:b.oy,width:SIZE,height:SIZE,rx:18,class:"b-shell"},world);
+    svgEl("rect",{x:b.ox,y:b.oy,width:SIZE,height:SIZE,rx:18,class:(FLOORS[floor].blocks||"ABC").includes(b.k)?"b-shell":"b-other"},world);
     const ax=b.ox+(b.fx?SIZE-280:160),ay=b.oy+(b.fy?SIZE-280:160);
     svgEl("rect",{x:ax,y:ay,width:120,height:120,rx:12,class:"b-void"},world);
     lab(ax+60,ay+56,"Block "+b.k,"b-label",{"text-anchor":"middle"});
@@ -520,11 +541,16 @@ function drawFloor(){
       const n=svgEl("g",{},g);svgEl("circle",{cx:sp.x,cy:sp.y,r:8,class:"pin"},n);svgEl("circle",{cx:sp.x,cy:sp.y,r:2.6,class:"core"},n);
       svgEl("rect",{x:sp.x-16,y:sp.y-16,width:32,height:32,rx:8,class:"halo"},g);
       nodes[sp.seats[0].id]=n;
-    }else if(sp.type==="table"){
+    }else if(sp.tw){
       svgEl("rect",{x:sp.x-sp.tw/2,y:sp.y-14,width:sp.tw,height:28,rx:7,class:"tbl"},g);
       sp.seats.forEach(s=>{const n=svgEl("g",{},g);svgEl("circle",{cx:s.x,cy:s.y,r:8,class:"pin"},n);svgEl("circle",{cx:s.x,cy:s.y,r:2.6,class:"core"},n);nodes[s.id]=n});
       svgEl("rect",{x:sp.x-sp.tw/2-8,y:sp.y-40,width:sp.tw+16,height:80,rx:10,class:"halo"},g);
       svgEl("rect",{x:sp.x-sp.tw/2-8,y:sp.y-40,width:sp.tw+16,height:80,fill:"transparent"},g);
+    }else if(sp.type==="cell"){
+      svgEl("rect",{x:sp.x-19,y:sp.y-15,width:38,height:30,rx:6,class:"room"},g);
+      const n=svgEl("g",{},g);svgEl("circle",{cx:sp.x,cy:sp.y,r:8,class:"pin"},n);svgEl("circle",{cx:sp.x,cy:sp.y,r:2.6,class:"core"},n);
+      svgEl("rect",{x:sp.x-22,y:sp.y-18,width:44,height:36,rx:8,class:"halo"},g);
+      nodes[sp.seats[0].id]=n;
     }else{
       svgEl("rect",{x:sp.x-36,y:sp.y-30,width:72,height:60,rx:8,class:"room"},g);
       const t=svgEl("text",{x:sp.x,y:sp.y+21,class:"room-t"},g);t.textContent=`${sp.cap} seats`;
@@ -552,9 +578,10 @@ function updateMap(){
     g.classList.toggle("sel",sel===sp);
   });
   for(const x of bubbles){
-    const list=seats.filter(s=>s.sp.floor===floor&&s.sp.block===x.b.k&&(filter==="all"||s.sp.type===filter));
-    x.a.textContent=filter==="room"?list.filter(s=>s.st==="free").length:freeSeats(list);
-    x.g.lastChild.lastChild.textContent=filter==="room"?"rooms free":"seats free";
+    const list=seats.filter(s=>s.sp.floor===floor&&s.sp.block===x.b.k&&(filter==="all"||s.sp.type===filter)),rm=filter==="room"||list.every(s=>s.sp.type==="room");
+    x.g.style.display=list.length?"":"none";
+    x.a.textContent=rm?list.filter(s=>s.st==="free").length:freeSeats(list);
+    x.g.lastChild.lastChild.textContent=rm?"rooms free":"seats free";
   }
 }
 function mapSize(){return[mapEl.clientWidth||340,mapEl.clientHeight||380]}
@@ -586,9 +613,9 @@ function placeTip(){
   const t=$("#tip");
   if(!sel||sel.floor!==floor||cam.s<.62||$("#v-map").classList.contains("on")===false){t.hidden=true;return}
   const free=freeSeats(sel.seats),tot=sel.seats.length;
-  const label=sel.type==="table"?`${tot-free} / ${tot} occupied`:sel.seats[0].st==="occ"?"Occupied":sel.seats[0].st==="off"?"Unavailable":"Available";
+  const label=sel.seats.length>1?`${tot-free} / ${tot} occupied`:sel.seats[0].st==="occ"?"Occupied":sel.seats[0].st==="off"?"Unavailable":"Available";
   setH(t,`<b>${sel.name}</b>${label}`);
-  const dy=(sel.type==="table"?40:sel.type==="room"?33:14)*cam.s;
+  const dy=(sel.seats.length>1?40:sel.type==="room"?33:14)*cam.s;
   t.style.left=Math.max(80,Math.min(mapSize()[0]-80,sel.x*cam.s+cam.x))+"px";t.style.top=(sel.y*cam.s+cam.y-dy)+"px";t.hidden=false;
 }
 /* pointer handling: drag, pinch, tap */
@@ -636,7 +663,7 @@ function renderSheet(){
   const sp=sel,sh=$("#sheet");if(!sp||sh.hidden&&sh._h===null&&false)return;
   const fr=freeSeats(sp.seats),tot=sp.seats.length,one=sp.seats[0];
   let pill,detail;
-  if(sp.type==="table"){
+  if(sp.seats.length>1){
     pill=`<span class="pill ${fr?"free":"occ"}">${tot-fr} of ${tot} seats occupied · ${fr} available</span>`;
     detail=`<div class="seatbar" aria-hidden="true">${sp.seats.map(s=>`<i class="${s.st==="free"?"":s.st}"></i>`).join("")}</div>`;
   }else{
@@ -645,16 +672,18 @@ function renderSheet(){
   }
   const mine=myBook(sp);
   if(mine)pill=`<span class="pill res">${mine.status==="in"?"Checked in":"Booked by you"} · ${mine.seats.length} ${mine.seats.length===1?"seat":"seats"} · ${mine.dur} h</span>`;
-  const where=`Block ${sp.block} · ${FLOORS[sp.floor].name}, floor ${sp.floor}${sp.cap?` · ${sp.cap} seats`:""}`;
+  const where=`Block ${sp.block} · ${FLOORS[sp.floor].name}, floor ${fl(sp.floor)}${sp.cap?` · ${sp.cap} seats`:""}${sp.note?` · ${sp.note}`:""}${sp.master?` · Master students only`:""}`;
+  const freeN=sp.seats.filter(q=>q.st==="free").length;
   const url=`https://use.mazemap.com/#v=1&campusid=10&zlevel=${sp.floor}&center=10.768052,59.948499&zoom=18`;
   let primary=`<a class="btn primary" href="${url}" target="_blank" rel="noopener">Open in MazeMap</a>`,body;
-  if(sp.type==="table"&&fr>0&&!mine)primary=`<button class="btn primary" data-act="book">Book table</button>`;
-  if(bookForm&&!mine&&fr>0){
-    bookForm.n=Math.min(bookForm.n,fr);
+  if(freeN>0&&!mine)primary=`<button class="btn primary" data-act="book">${BOOK_LABEL[sp.type]}</button>`;
+  if(bookForm&&!mine&&freeN>0){
+    bookForm.n=Math.min(bookForm.n,freeN);
     body=`<div class="form">${pill}
-      <div class="field"><span>Seats</span><div class="stepper"><button data-act="less" aria-label="Fewer seats" ${bookForm.n<=1?"disabled":""}>−</button><b>${bookForm.n}</b><button data-act="more" aria-label="More seats" ${bookForm.n>=fr?"disabled":""}>+</button></div></div>
+      ${sp.seats.length>1?`<div class="field"><span>Seats</span><div class="stepper"><button data-act="less" aria-label="Fewer seats" ${bookForm.n<=1?"disabled":""}>−</button><b>${bookForm.n}</b><button data-act="more" aria-label="More seats" ${bookForm.n>=freeN?"disabled":""}>+</button></div></div>`:""}
+      ${sp.master?`<p class="muted">This room is for master students. You may be asked to show your student card.</p>`:""}
       <div class="field"><span>Time</span><div class="durs">${[1,2,3].map(h=>`<button class="chip" data-act="dur" data-h="${h}" aria-pressed="${bookForm.dur===h}">${h} h</button>`).join("")}</div></div>
-      <p class="muted">We hold your seats for ${HOLD} minutes. If you don't check in by then, they become available again.</p>
+      <p class="muted">We hold your ${sp.type==="room"?"room":sp.seats.length>1?"seats":"spot"} for ${HOLD} minutes. If you don't check in by then, ${sp.seats.length>1&&sp.type!=="room"?"they become":"it becomes"} available again.</p>
       <div class="actions"><button class="btn ghost" data-act="back">Back</button><button class="btn primary" data-act="confirm">Confirm booking</button></div></div>`;
   }else if(mine){
     const shareBtn=share&&share.sp===sp?`<button class="btn ghost" data-act="unshare">Stop sharing</button>`:`<button class="btn ghost" data-act="share">Share my spot</button>`;
@@ -667,6 +696,8 @@ function renderSheet(){
   setH(sh,`<div class="sheet-head"><div><h2>${sp.name}</h2><p class="muted">${where}</p></div><button class="close" data-act="close" aria-label="Close">×</button></div>
   ${body}`);
 }
+const BOOK_LABEL={table:"Book table",room:"Book room",desk:"Book desk",cell:"Book study cell",lab:"Book workstation"};
+const bookWhat=(sp,n)=>sp.type==="room"?"the whole room":`${n} ${n===1?"seat":"seats"}`;
 function doBook(b,what){
   if(!b)return;
   if(what==="cancel"){endBooking(b,"Cancelled");showNote("Booking cancelled. The seats are available again.")}
@@ -679,7 +710,7 @@ $("#sheet").addEventListener("click",e=>{
   if(act==="close")select(null);
   if(act==="share"){startShare(sel);renderAll();goTab("friends");return}
   if(act==="unshare"){stopShare("You stopped sharing your spot.")}
-  if(act==="book")bookForm={n:Math.min(2,freeSeats(sel.seats)),dur:2};
+  if(act==="book")bookForm={n:Math.min(sel.seats.length>1?2:1,sel.seats.filter(q=>q.st==="free").length),dur:2};
   if(act==="back")bookForm=null;
   if(act==="less")bookForm.n--;
   if(act==="more")bookForm.n++;
@@ -688,7 +719,7 @@ $("#sheet").addEventListener("click",e=>{
     const pick=sel.seats.filter(q=>q.st==="free").slice(0,bookForm.n);
     pick.forEach(q=>{q.st="res"});
     bookings.push({id:++bookSeq,sp:sel,seats:pick,dur:bookForm.dur,until:T+HOLD,status:"held",made:T});bookForm=null;
-    showNote(`Booked ${pick.length} ${pick.length===1?"seat":"seats"} at ${sel.name}. Find it in Bookings.`);
+    showNote(`Booked ${bookWhat(sel,pick.length)} at ${sel.name}. Find it in Bookings.`);
   }
   if(act==="cancel")doBook(myBook(sel),"cancel");
   if(act==="checkin")doBook(myBook(sel),"checkin");
@@ -699,21 +730,23 @@ $("#sheet").addEventListener("click",e=>{
 
 /* ---------- floors, list, search ---------- */
 function renderFloors(){
-  setH($("#floors"),Object.keys(FLOORS).map(Number).sort((a,b)=>b-a).map(f=>`<button data-floor="${f}" aria-pressed="${f===floor}" aria-label="Floor ${f}">${f}</button>`).join(""));
+  setH($("#floors"),Object.keys(FLOORS).map(Number).sort((a,b)=>b-a).map(f=>`<button data-floor="${f}" aria-pressed="${f===floor}" aria-label="Floor ${fl(f)}">${fl(f)}</button>`).join(""));
 }
 $("#floors").addEventListener("click",e=>{const b=e.target.closest("[data-floor]");if(!b)return;floor=+b.dataset.floor;select(null);renderFloors();drawFloor();renderSummary()});
 function renderSummary(){
   const fs=seats.filter(s=>s.sp.floor===floor);
-  $("#sumA").textContent=`${freeSeats(fs)} of ${totalSeats(fs)} seats free`;
+  const rm=fs.filter(s=>s.sp.type==="room");
+  $("#sumA").textContent=totalSeats(fs)?`${freeSeats(fs)} of ${totalSeats(fs)} seats free`:`${rm.filter(s=>s.st==="free").length} of ${rm.length} group rooms free`;
   $("#sumB").textContent=floorName(floor);
 }
 function renderList(){
   const rows=Object.keys(FLOORS).map(Number).map(f=>{
     const fs=seats.filter(s=>s.sp.floor===f),tables=spaces.filter(s=>s.floor===f&&s.type==="table"),rooms=spaces.filter(s=>s.floor===f&&s.type==="room");
-    return{f,free:freeSeats(fs),tot:totalSeats(fs),t:tables.filter(t=>freeSeats(t.seats)>0).length,r:rooms.filter(r=>r.seats[0].st==="free").length};
+    const ts=totalSeats(fs),fr=rooms.filter(r=>r.seats[0].st==="free").length;
+    return{f,nt:tables.length,free:ts?freeSeats(fs):fr,tot:ts||rooms.length,unit:ts?"":" rooms",t:tables.filter(t=>freeSeats(t.seats)>0).length,r:rooms.filter(r=>r.seats[0].st==="free").length};
   }).sort((a,b)=>b.free/b.tot-a.free/a.tot);
   setH($("#list"),rows.map(r=>`<button class="row" data-goto="${r.f}">
-    <span class="row-top"><span><b>${FLOORS[r.f].name}</b><br><span class="muted">Floor ${r.f} · ${r.t} tables with space · ${r.r} ${r.r===1?"room":"rooms"} free</span></span><span class="count">${r.free} <small>of ${r.tot}</small></span></span>
+    <span class="row-top"><span><b>${FLOORS[r.f].name}</b><br><span class="muted">Floor ${fl(r.f)}${r.nt?` · ${r.t} tables with space`:""} · ${r.r} ${r.r===1?"room":"rooms"} free</span></span><span class="count">${r.free} <small>of ${r.tot}${r.unit}</small></span></span>
     <span class="track"><i style="width:${Math.round((1-r.free/r.tot)*100)}%"></i></span></button>`).join(""));
 }
 $("#list").addEventListener("click",e=>{const b=e.target.closest("[data-goto]");if(!b)return;floor=+b.dataset.goto;goTab("map");renderFloors();drawFloor();renderSummary();const[w,h]=mapSize();flyTo(500,500,Math.min(w,h)/1000)});
@@ -725,8 +758,8 @@ $("#chips").addEventListener("click",e=>{
 $("#q").addEventListener("input",e=>{
   const v=e.target.value.trim().toLowerCase(),box=$("#results");
   if(!v){box.hidden=true;return}
-  const hits=spaces.filter(s=>(`${s.name} block ${s.block} floor ${s.floor} ${FLOORS[s.floor].name}`).toLowerCase().includes(v)).sort((a,b)=>freeSeats(b.seats)-freeSeats(a.seats)).slice(0,8);
-  box.innerHTML=hits.length?hits.map(s=>`<button data-sp="${s.id}"><span>${s.name}</span><small>Floor ${s.floor}${s.type==="table"?` · ${freeSeats(s.seats)} free`:` · ${s.seats[0].st==="free"?"free":s.seats[0].st==="occ"?"taken":"offline"}`}</small></button>`).join(""):`<button disabled><span>No space matches "${v.replace(/[<>&]/g,"")}". Try "library" or "Block B".</span></button>`;
+  const hits=spaces.filter(s=>(`${s.name} block ${s.block} floor ${fl(s.floor)} ${FLOORS[s.floor].name}`).toLowerCase().includes(v)).sort((a,b)=>freeSeats(b.seats)-freeSeats(a.seats)).slice(0,8);
+  box.innerHTML=hits.length?hits.map(s=>`<button data-sp="${s.id}"><span>${s.name}</span><small>Floor ${fl(s.floor)}${s.seats.length>1?` · ${freeSeats(s.seats)} free`:` · ${s.seats[0].st==="free"?"free":s.seats[0].st==="occ"?"taken":"offline"}`}</small></button>`).join(""):`<button disabled><span>No space matches "${v.replace(/[<>&]/g,"")}". Try "library" or "Block B".</span></button>`;
   box.hidden=false;
 });
 $("#results").addEventListener("click",e=>{const b=e.target.closest("[data-sp]");if(!b)return;$("#results").hidden=true;$("#q").value="";select(byId[b.dataset.sp])});
@@ -806,7 +839,7 @@ function renderInsights(){
     if(t%120===0)g+=`<text class="c-t" x="${L+i*bw+bw/2}" y="${H-5}" text-anchor="middle">${fmt(t)}</text>`;
   });
   setH($("#chart"),`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Campus occupancy by half hour today">${g}</svg>`);
-  const rows=Object.keys(FLOORS).map(Number).sort((a,b)=>b-a).flatMap(f=>BLOCKS.map(b=>{const l=seats.filter(s=>s.sp.floor===f&&s.sp.block===b.k&&isSeat(s)&&s.st!=="off");return{n:`Floor ${f}, Block ${b.k}`,v:l.filter(s=>s.st==="occ").length/l.length}})).sort((a,b)=>b.v-a.v);
+  const rows=Object.keys(FLOORS).map(Number).sort((a,b)=>b-a).flatMap(f=>BLOCKS.map(b=>{const l=seats.filter(s=>s.sp.floor===f&&s.sp.block===b.k&&isSeat(s)&&s.st!=="off");return{n:`Floor ${fl(f)}, Block ${b.k}`,v:l.filter(s=>s.st==="occ").length/l.length,k:l.length}})).filter(r=>r.k).sort((a,b)=>b.v-a.v);
   const show=[...rows.slice(0,3),...rows.slice(-3)];
   setH($("#floorBars"),`<p class="muted" style="margin-bottom:8px">Most and least used areas right now</p><div style="display:grid;gap:7px">${show.map(r=>`<div style="display:grid;grid-template-columns:118px minmax(0,1fr) 38px;gap:8px;align-items:center;font-size:13px"><span>${r.n}</span><span class="meter"><i style="width:${Math.round(r.v*100)}%"></i></span><span class="mono" style="text-align:right">${Math.round(r.v*100)}%</span></div>`).join("")}</div>`);
   const top=rows[0],low=rows[rows.length-1];
@@ -850,7 +883,7 @@ function shareUrl(){
   return location.origin+location.pathname+"#at="+encodeURIComponent(share.sp.id)+"&n="+encodeURIComponent(myName.trim().slice(0,30)||"A friend");
 }
 function renderFriends(){
-  const who=friends.filter(f=>f.see).length, where=sp=>`${sp.name} · ${FLOORS[sp.floor].name}, floor ${sp.floor}`;
+  const who=friends.filter(f=>f.see).length, where=sp=>`${sp.name} · ${FLOORS[sp.floor].name}, floor ${fl(sp.floor)}`;
   const card=share?`<div class="share-card"><h3>You are ready to share this spot</h3><p>${where(share.sp)}</p>
     <p class="muted">${who?`${who} ${who===1?"friend":"friends"} can see it`:"Nobody can see it yet. Tick friends below."} · Stops at ${fmt(share.until)}</p>
     <label class="muted" for="myName">Your name on the link</label><input class="field-in" id="myName" maxlength="30" autocomplete="name" placeholder="Your name" value="${esc(myName)}">
@@ -909,16 +942,16 @@ function showNote(t){
 let noteText="",noteUntil=0;
 function renderBook(){
   const bar=$("#bookBar"),held=bookings.filter(b=>b.status==="held").sort((a,b)=>a.until-b.until)[0];
-  if(held){bar.hidden=false;setH(bar,`<span>${held.sp.name} · ${held.seats.length} ${held.seats.length===1?"seat":"seats"}</span><span>Check in within ${Math.max(0,held.until-T)} min</span>`)}
+  if(held){bar.hidden=false;setH(bar,`<span>${held.sp.name} · ${held.sp.type==="room"?"whole room":`${held.seats.length} ${held.seats.length===1?"seat":"seats"}`}</span><span>Check in within ${Math.max(0,held.until-T)} min</span>`)}
   else if(noteText&&T<noteUntil){bar.hidden=false;setH(bar,`<span>${noteText}</span>`)}
   else bar.hidden=true;
   const n=$("#navN");n.hidden=!bookings.length;n.textContent=bookings.length;
-  const where=b=>`Block ${b.sp.block} · ${FLOORS[b.sp.floor].name}, floor ${b.sp.floor}`,seatsTxt=b=>`${b.seats.length} ${b.seats.length===1?"seat":"seats"} · ${b.dur} h`;
+  const where=b=>`Block ${b.sp.block} · ${FLOORS[b.sp.floor].name}, floor ${fl(b.sp.floor)}`,seatsTxt=b=>`${b.sp.type==="room"?"Whole room":`${b.seats.length} ${b.seats.length===1?"seat":"seats"}`} · ${b.dur} h`;
   const card=b=>`<div class="bk"><div class="bk-top"><span><b>${b.sp.name}</b><br><span class="muted">${where(b)}</span></span><span class="pill ${b.status==="in"?"occ":"res"}">${b.status==="in"?"Checked in":"Booked"}</span></div>
     <p class="muted">${seatsTxt(b)} · ${b.status==="in"?`ends at ${fmt(b.endAt)}`:`check in within ${Math.max(0,b.until-T)} min`}</p>
     <div class="actions">${b.status==="held"?`<button class="btn primary small" data-bk="${b.id}" data-do="checkin">Check in</button><button class="btn ghost small" data-bk="${b.id}" data-do="cancel">Cancel</button>`:`<button class="btn ghost small" data-bk="${b.id}" data-do="finish">End booking</button>`}<button class="btn ghost small" data-bk="${b.id}" data-do="show">Show on map</button></div></div>`;
   const old=b=>`<div class="bk"><div class="bk-top"><span><b>${b.sp.name}</b><br><span class="muted">${seatsTxt(b)} · booked ${fmt(b.made)}</span></span><span class="pill off">${b.label}</span></div></div>`;
-  setH($("#bookList"),(bookings.length?bookings.map(card).join(""):`<div class="empty"><p class="muted">You have no active bookings. Choose a table with free seats on the map to book it.</p><button class="btn primary" data-do="find" style="flex:none">Find a table</button></div>`)+(past.length?`<h3>Earlier today</h3>${past.slice(0,10).map(old).join("")}`:""));
+  setH($("#bookList"),(bookings.length?bookings.map(card).join(""):`<div class="empty"><p class="muted">You have no active bookings. Choose a free table, desk, study cell or group room on the map to book it.</p><button class="btn primary" data-do="find" style="flex:none">Find a space</button></div>`)+(past.length?`<h3>Earlier today</h3>${past.slice(0,10).map(old).join("")}`:""));
 }
 $("#bookBar").addEventListener("click",()=>{if(bookings.length)goTab("book")});
 $("#bookList").addEventListener("click",e=>{
@@ -970,7 +1003,7 @@ function paint(){
   if(!far){
     const tw=Math.max(6,R*2.1);
     for(const sp of spaces){
-      if(sp.floor!==floor||sp.type!=="table")continue;
+      if(sp.floor!==floor||!sp.tw)continue;
       const f=sp.seats.length/2,top=sp.seats.slice(0,f),bot=sp.seats.slice(f),mid=(a,b)=>{const p=mm.project(seatLL(a)),q=mm.project(seatLL(b));return[(p.x+q.x)/2,(p.y+q.y)/2]};
       const l=mid(top[0],bot[0]),e=mid(top[f-1],bot[f-1]);
       ctx.globalAlpha=filter!=="all"&&filter!=="table"?.15:1;
@@ -1004,7 +1037,8 @@ function paintBubbles(far){
     const el=box.querySelector(`[data-b="${b.k}"]`),l=seats.filter(s=>s.sp.floor===floor&&s.sp.block===b.k&&(filter==="all"||s.sp.type===filter));
     const p=mm.project(ll(b.ox+SIZE/2,b.oy+SIZE/2));
     el.style.left=p.x+"px";el.style.top=p.y+"px";
-    const n=filter==="room"?l.filter(s=>s.st==="free").length:freeSeats(l),w=filter==="room"?(n===1?"room free":"rooms free"):(n===1?"seat free":"seats free");
+    el.hidden=!l.length;const rm=filter==="room"||l.every(s=>s.sp.type==="room");
+    const n=rm?l.filter(s=>s.st==="free").length:freeSeats(l),w=rm?(n===1?"room free":"rooms free"):(n===1?"seat free":"seats free");
     setH(el,`<b>${n}</b><span>${w}</span>`);el.setAttribute("aria-label",`Block ${b.k}: ${n} ${w}. Zoom in`);
   }
 }
@@ -1012,7 +1046,7 @@ function placeTipReal(){
   const t=$("#tip");
   if(!sel||sel.floor!==floor||mm.getZoom()<NEAR||!$("#v-map").classList.contains("on")){t.hidden=true;return}
   const fr=freeSeats(sel.seats),tot=sel.seats.length;
-  setH(t,`<b>${sel.name}</b>${sel.type==="table"?`${tot-fr} / ${tot} occupied`:sel.seats[0].st==="occ"?"Occupied":sel.seats[0].st==="off"?"Unavailable":"Available"}`);
+  setH(t,`<b>${sel.name}</b>${sel.seats.length>1?`${tot-fr} / ${tot} occupied`:sel.seats[0].st==="occ"?"Occupied":sel.seats[0].st==="off"?"Unavailable":"Available"}`);
   const ys=sel.seats.map(s=>mm.project(seatLL(s)));
   t.style.left=Math.max(80,Math.min(mapEl.clientWidth-80,ys.reduce((a,p)=>a+p.x,0)/ys.length))+"px";
   t.style.top=(Math.min(...ys.map(p=>p.y))-12)+"px";t.hidden=false;
@@ -1075,7 +1109,7 @@ function start(){
   const sp=demoTable;if(!mm)sel=sp;
   cam.s=.86;const[w,h]=mapSize();cam.x=w/2-sp.x*cam.s-60;cam.y=h*.42-sp.y*cam.s;applyCam();
   updateMap();renderAll();
-  if(!mm)openShared();
+  if(typeof mm==="undefined"||!mm)openShared();
   setInterval(()=>{step();renderAll()},10000);
 }
 initReal();
