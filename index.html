@@ -398,9 +398,9 @@ for(const f of Object.keys(FLOORS).map(Number)){
     const c={...base,...((base.per||{})[b.k]||{})};
     const P=(x,y)=>[b.ox+(b.fx?SIZE-x:x),b.oy+(b.fy?SIZE-y:y)];
     let n=1;
-    const desk=(x,y)=>{const num=String(n++).padStart(2,"0"),p=P(x,y);addSpace({id:`${b.k}${fl(f)}-D${num}`,type:"desk",name:`Desk ${b.k}${fl(f)}-${num}`,floor:f,block:b.k,w:b.w*c.w,x:p[0],y:p[1]},[p],rnd()<.02)};
-    if(c.desks>=1)for(let x=26;x<=364;x+=34)desk(x,26);
-    if(c.desks>=2)for(let y=60;y<=364;y+=34)desk(26,y);
+    const desk=(x,y,zone)=>{const num=String(n++).padStart(2,"0"),p=P(x,y);addSpace({id:`${b.k}${fl(f)}-D${num}`,type:"desk",zone,name:`Desk ${b.k}${fl(f)}-${num}`,floor:f,block:b.k,w:b.w*c.w,x:p[0],y:p[1]},[p],rnd()<.02)};
+    if(c.desks>=1)for(let x=26;x<=364;x+=34)desk(x,26,"top");
+    if(c.desks>=2)for(let y=60;y<=364;y+=34)desk(26,y,"side");
     TBL.slice(0,c.tables).forEach((t,i)=>{
       const p=P(t[0],t[1]),m=t[2]/2,pts=[];
       for(const dy of[-27,27])for(let j=0;j<m;j++)pts.push([p[0]+(j-(m-1)/2)*26,p[1]+dy]);
@@ -425,6 +425,17 @@ for(const f of Object.keys(FLOORS).map(Number)){
       addSpace({id:`${b.k}${fl(f)}-L1`,type:"lab",name:`Data Lab ${b.k}${fl(f)}`,floor:f,block:b.k,w:b.w*c.w*.8,x:p[0],y:p[1],tw:112,note:"Morningstar / LSEG Workspace"},pts);
     }
   }
+}
+/* Which spaces can be booked. Quiet library desks are drop-in only, group rooms are always bookable, and some group tables are drop-in. */
+const hash=id=>[...id].reduce((h,c)=>(Math.imul(h,31)+c.charCodeAt(0))>>>0,7);
+for(const sp of spaces){
+  const lib=FLOORS[sp.floor].name==="Library";
+  if(sp.type==="desk"){
+    sp.quiet=lib&&sp.zone==="top";
+    sp.book=!sp.quiet&&((sp.floor===5&&"BC".includes(sp.block))||sp.floor===6);
+  }else if(sp.type==="table")sp.book=sp.name==="Group Table A"||hash(sp.id)%10<6;
+  else if(sp.type==="room")sp.book=true;
+  else sp.book=true;
 }
 const live=seats.filter(s=>s.st!=="off");
 const isSeat=s=>s.sp.type!=="room";
@@ -672,11 +683,11 @@ function renderSheet(){
   }
   const mine=myBook(sp);
   if(mine)pill=`<span class="pill res">${mine.status==="in"?"Checked in":"Booked by you"} · ${mine.seats.length} ${mine.seats.length===1?"seat":"seats"} · ${mine.dur} h</span>`;
-  const where=`Block ${sp.block} · ${FLOORS[sp.floor].name}, floor ${fl(sp.floor)}${sp.cap?` · ${sp.cap} seats`:""}${sp.note?` · ${sp.note}`:""}${sp.master?` · Master students only`:""}`;
+  const where=`Block ${sp.block} · ${FLOORS[sp.floor].name}, floor ${fl(sp.floor)}${sp.cap?` · ${sp.cap} seats`:""}${sp.note?` · ${sp.note}`:""}${sp.master?` · Master students only`:""}${sp.quiet?` · Quiet area`:""}`;
   const freeN=sp.seats.filter(q=>q.st==="free").length;
   const url=`https://use.mazemap.com/#v=1&campusid=10&zlevel=${sp.floor}&center=10.768052,59.948499&zoom=18`;
   let primary=`<a class="btn primary" href="${url}" target="_blank" rel="noopener">Open in MazeMap</a>`,body;
-  if(freeN>0&&!mine)primary=`<button class="btn primary" data-act="book">${BOOK_LABEL[sp.type]}</button>`;
+  if(freeN>0&&!mine&&sp.book)primary=`<button class="btn primary" data-act="book">${BOOK_LABEL[sp.type]}</button>`;
   if(bookForm&&!mine&&freeN>0){
     bookForm.n=Math.min(bookForm.n,freeN);
     body=`<div class="form">${pill}
@@ -691,6 +702,7 @@ function renderSheet(){
       :`${pill}${detail}<p class="muted">Check in within ${Math.max(0,mine.until-T)} min to keep your seats.</p>
       <div class="actions"><button class="btn primary" data-act="checkin">Check in</button><button class="btn ghost" data-act="cancel">Cancel booking</button>${shareBtn}</div>`;
   }else{
+    if(!sp.book)detail+=`<p class="muted">${sp.quiet?"Quiet area. ":""}Drop-in only: this spot can't be booked, but you can see if it's free.</p>`;
     body=`${pill}${detail}<div class="actions">${primary}${share&&share.sp===sp?`<button class="btn ghost" data-act="unshare">Stop sharing</button>`:`<button class="btn ghost" data-act="share">Share my spot</button>`}</div>`;
   }
   setH(sh,`<div class="sheet-head"><div><h2>${sp.name}</h2><p class="muted">${where}</p></div><button class="close" data-act="close" aria-label="Close">×</button></div>
@@ -759,7 +771,7 @@ $("#q").addEventListener("input",e=>{
   const v=e.target.value.trim().toLowerCase(),box=$("#results");
   if(!v){box.hidden=true;return}
   const hits=spaces.filter(s=>(`${s.name} block ${s.block} floor ${fl(s.floor)} ${FLOORS[s.floor].name}`).toLowerCase().includes(v)).sort((a,b)=>freeSeats(b.seats)-freeSeats(a.seats)).slice(0,8);
-  box.innerHTML=hits.length?hits.map(s=>`<button data-sp="${s.id}"><span>${s.name}</span><small>Floor ${fl(s.floor)}${s.seats.length>1?` · ${freeSeats(s.seats)} free`:` · ${s.seats[0].st==="free"?"free":s.seats[0].st==="occ"?"taken":"offline"}`}</small></button>`).join(""):`<button disabled><span>No space matches "${v.replace(/[<>&]/g,"")}". Try "library" or "Block B".</span></button>`;
+  box.innerHTML=hits.length?hits.map(s=>`<button data-sp="${s.id}"><span>${s.name}</span><small>${s.book?"Bookable · ":"Drop-in · "}Floor ${fl(s.floor)}${s.seats.length>1?` · ${freeSeats(s.seats)} free`:` · ${s.seats[0].st==="free"?"free":s.seats[0].st==="occ"?"taken":"offline"}`}</small></button>`).join(""):`<button disabled><span>No space matches "${v.replace(/[<>&]/g,"")}". Try "library" or "Block B".</span></button>`;
   box.hidden=false;
 });
 $("#results").addEventListener("click",e=>{const b=e.target.closest("[data-sp]");if(!b)return;$("#results").hidden=true;$("#q").value="";select(byId[b.dataset.sp])});
