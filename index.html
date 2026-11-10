@@ -626,7 +626,7 @@ function placeTip(){
   const t=$("#tip");
   if(!sel||sel.floor!==floor||cam.s<.62||$("#v-map").classList.contains("on")===false){t.hidden=true;return}
   const free=freeSeats(sel.seats),tot=sel.seats.length;
-  const label=sel.seats.length>1?`${tot-free} / ${tot} occupied`:sel.seats[0].st==="occ"?"Occupied":sel.seats[0].st==="off"?"Unavailable":"Available";
+  const label=FLOORS[sel.floor].exam?"Closed for exam":sel.seats.length>1?`${tot-free} / ${tot} occupied`:sel.seats[0].st==="occ"?"Occupied":sel.seats[0].st==="off"?"Unavailable":"Available";
   setH(t,`<b>${sel.name}</b>${label}`);
   const dy=(sel.seats.length>1?40:sel.type==="room"?33:14)*cam.s;
   t.style.left=Math.max(80,Math.min(mapSize()[0]-80,sel.x*cam.s+cam.x))+"px";t.style.top=(sel.y*cam.s+cam.y-dy)+"px";t.hidden=false;
@@ -684,6 +684,7 @@ function renderSheet(){
     pill=`<span class="pill ${one.st}">${one.st==="free"?"Available":one.st==="occ"?"Occupied":"Unavailable"}</span>`;
     detail=`<p class="muted">${statusText(one)}</p>`;
   }
+  if(FLOORS[sp.floor].exam){pill=`<span class="pill off">Unavailable today · exam</span>`;detail=`<p class="muted">${statusText(sp.seats[0])}</p>`}
   const mine=myBook(sp);
   if(mine)pill=`<span class="pill res">${mine.status==="in"?"Checked in":"Booked by you"} · ${mine.seats.length} ${mine.seats.length===1?"seat":"seats"} · ${mine.dur} h</span>`;
   const where=`Block ${sp.block} · ${FLOORS[sp.floor].name}, floor ${fl(sp.floor)}${sp.cap?` · ${sp.cap} seats`:""}${sp.note?` · ${sp.note}`:""}${sp.master?` · Master students only`:""}${sp.quiet?` · Quiet area`:""}`;
@@ -1064,7 +1065,7 @@ function placeTipReal(){
   const t=$("#tip");
   if(!sel||sel.floor!==floor||mm.getZoom()<NEAR||!$("#v-map").classList.contains("on")){t.hidden=true;return}
   const fr=freeSeats(sel.seats),tot=sel.seats.length;
-  setH(t,`<b>${sel.name}</b>${sel.seats.length>1?`${tot-fr} / ${tot} occupied`:sel.seats[0].st==="occ"?"Occupied":sel.seats[0].st==="off"?"Unavailable":"Available"}`);
+  setH(t,`<b>${sel.name}</b>${FLOORS[sel.floor].exam?"Closed for exam":sel.seats.length>1?`${tot-fr} / ${tot} occupied`:sel.seats[0].st==="occ"?"Occupied":sel.seats[0].st==="off"?"Unavailable":"Available"}`);
   const ys=sel.seats.map(s=>mm.project(seatLL(s)));
   t.style.left=Math.max(80,Math.min(mapEl.clientWidth-80,ys.reduce((a,p)=>a+p.x,0)/ys.length))+"px";
   t.style.top=(Math.min(...ys.map(p=>p.y))-12)+"px";t.hidden=false;
